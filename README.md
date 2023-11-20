@@ -18,11 +18,11 @@ Implement exit and info commands. A basic Makefile (also from project 1).
 
 ### Part 2: Navigation [10 points]
 - **Responsibilities**: 
-- **Assigned to**: 
+- **Assigned to**: Laura Obermaier
 
 ### Part 3: Create [15 points]
 - **Responsibilities**: 
-- **Assigned to**: 
+- **Assigned to**: Laura Obermaier
 
 ### Part 4: Read [20 points]
 - **Responsibilities**: 
