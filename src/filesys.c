@@ -17,11 +17,13 @@ typedef struct __attribute__((packed)) BPB {
 	uint16_t BPB_TotSec16;
 	uint8_t BPB_Media;
 	uint16_t BPB_FATSz16;
+	uint32_t BPB_FATSz32;
 	uint16_t BPB_SecPerTrk;
 	uint16_t BPB_NumHeads;
 	uint32_t BPB_HiddSec;
 	uint32_t BPB_TotSec32;
 } bpb_t;
+
 
 typedef struct __attribute__((packed)) directory_entry {
     char DIR_Name[11];
@@ -46,7 +48,10 @@ tokenlist * get_tokens(char *input);
 tokenlist * new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
+void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb);
 void print_boot_sector_info(bpb_t bpb);
+void dbg_print_dentry(dentry_t *dentry);
+void mkdir(bpb_t bpb, const char* new);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
@@ -77,6 +82,52 @@ bpb_t mount_fat32(int img_fd) {
     return bpb;
 }
 
+// the offset to the beginning of the file.
+uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset) {
+    uint32_t fat_region_offset = 0x4000;
+    return (offset - fat_region_offset)/4;
+}
+
+uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num) {
+    uint32_t fat_region_offset = 0x4000;
+    return fat_region_offset + clus_num * 4;
+}
+
+// This function returns one directory entry. (PESUDOCODE)
+dentry_t *encode_dir_entry(int fat32_fd, uint32_t offset) {
+    dentry_t *dentry = (dentry_t*)malloc(sizeof(dentry_t));
+    ssize_t rd_bytes = pread(fat32_fd, (void*)dentry, sizeof(dentry_t), offset);
+
+    if (rd_bytes != sizeof(dentry_t)) {
+        // Handle error: The read data size doesn't match the size of a directory entry.
+        free(dentry);
+        return NULL;
+    }
+
+    // Check if the attributes indicate that it's a directory entry
+    if ((dentry->DIR_Attr & 0x08) != 0) {
+        // This is a volume label, not a directory entry
+        free(dentry);
+        return NULL;
+    }
+
+    return dentry;
+}
+
+bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
+    // Define the values that indicate the end of a file and bad clusters in FAT32.
+    uint32_t fat32_end_of_file = 0x0FFFFFFF;
+    uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
+    uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
+
+    // Check if the cluster number falls within the range of bad clusters or is the end of the file.
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
+        return true;
+    }
+
+    return false;
+}
+
 //main function (loops) (all the functionality is called or written here)
 void main_process(const char* img_path, bpb_t bpb) {
     while (1) {
@@ -101,6 +152,10 @@ void main_process(const char* img_path, bpb_t bpb) {
             printf("info command does not take any arguments\n");
         else if (strcmp(tokens->items[0], "info") == 0)
             print_boot_sector_info(bpb);
+        else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
+            printf("mkdir command does not take more than two arguments\n");
+        else if (strcmp(tokens->items[0], "mkdir") == 0)
+            mkdir(bpb, tokens->items[1]);
         // else if cmd is "cd" process_cd();
         // else if cmd is "ls" process_ls();
         // ...
@@ -128,9 +183,36 @@ int main(int argc, char const *argv[])
     // 2. mount the fat32.img
     bpb_t bpb = mount_fat32(img_fd);
 
+    uint32_t offset = 0;
+    uint32_t curr_clus_num = 3;
+    uint32_t next_clus_num = 0;
+    uint32_t BPB_SecPerClus = 1;
+    uint32_t BPB_FATSz32 = 1009;
+    uint32_t max_clus_num = BPB_FATSz32 / BPB_SecPerClus;
+    uint32_t min_clus_num = 2;
+
+    while (curr_clus_num >= min_clus_num && curr_clus_num <= max_clus_num) {
+        // if the cluster number is not in the range, this cluster is:
+        // 1. reserved cluster
+        // 2. end of the file
+        // 3. bad cluster.
+        // No matter which kind of number, we can consider it is the end of a file.
+        if (is_end_of_file_or_bad_cluster(curr_clus_num)) {
+            printf("This cluster is the end of a file or a bad cluster: %u\n", curr_clus_num);
+            break; // Exit the loop if it's the end of a file or a bad cluster.
+        }
+
+	process_directory_entries(img_fd, curr_clus_num, bpb);
+
+        offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
+        pread(img_fd, &next_clus_num, sizeof(uint32_t), offset);
+        printf("current cluster number: %u, next cluster number: %u\n", \
+                curr_clus_num, next_clus_num);
+        curr_clus_num = next_clus_num;
+    }
+
     // 3. main procees
     main_process(img_path, bpb);
-
 
     // 4. close all opened files
 
@@ -138,6 +220,37 @@ int main(int argc, char const *argv[])
     close(img_fd);
 
     return 0;
+}
+
+
+void mkdir(bpb_t bpb, const char* new){
+    //ADD CODE TO MAKE A DIRECTORY HERE, HERE ARE THE REQUIREMENTS:
+    /*
+    1. for each dentry in cwd’s dentries
+    2. compare the name of the dentry with [dirname]
+    3. prompt errors if existing one dentry that has the same
+    name
+    4. if the cluster is full, allocate a new cluster for cwd
+    5. find a free dentry for [dirname]
+    6. allocate a cluster for [dirname]
+    7. init the dentry for [dirname], including name,
+    attributes, clusterHi and clusterLo, etc.
+    */
+}
+
+
+void dbg_print_dentry(dentry_t *dentry) {
+    if (dentry == NULL) {
+        return;
+    }
+
+    // Combine DIR_FstClusHI and DIR_FstClusLO to get the correct cluster number
+    uint32_t firstCluster = ((uint32_t)dentry->DIR_FstClusHI << 16) | (uint32_t)dentry->DIR_FstClusLO;
+
+    printf("DIR_Name: %s\n", dentry->DIR_Name);
+    printf("DIR_Attr: 0x%x\n", dentry->DIR_Attr);
+    printf("First Cluster Number: %u\n", firstCluster);
+    printf("DIR_FileSize: %u\n", dentry->DIR_FileSize);
 }
 
 void print_boot_sector_info(bpb_t bpb) {
@@ -150,6 +263,30 @@ void print_boot_sector_info(bpb_t bpb) {
     printf("# of Entries in One FAT: %u\n", bpb.BPB_NumFATs);
     uint32_t imageSize = bpb.BPB_TotSec32 * bpb.BPB_BytsPerSec;
     printf("Size of Image (in bytes): %u\n", imageSize);
+}
+
+// Revised function to read and process directory entries
+void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    uint32_t dataRegionOffset = ((cluster_num - 2) * clusterSize) +
+                                (bpb.BPB_NumFATs * bpb.BPB_FATSz32 * sectorSize) +
+                                (bpb.BPB_RsvdSecCnt * sectorSize);
+
+    for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
+        dentry_t dentry;
+        ssize_t rd_bytes = pread(fat32_fd, &dentry, sizeof(dentry_t), dataRegionOffset + i);
+
+        if (rd_bytes != sizeof(dentry_t)) {
+		//Handle error
+		break;
+	}
+
+	//Check if the entry is a valid file or directory
+	if ((dentry.DIR_Attr & 0x10) == 0x10 || (dentry.DIR_Attr & 0x20) == 0x20) {
+            dbg_print_dentry(&dentry);
+        }
+    }
 }
 
 //GETS THE INPUT FROM THE COMMAND LINE
