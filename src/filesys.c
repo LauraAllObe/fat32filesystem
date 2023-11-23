@@ -223,21 +223,73 @@ int main(int argc, char const *argv[])
 }
 
 
-void mkdir(bpb_t bpb, const char* new){
-    //ADD CODE TO MAKE A DIRECTORY HERE, HERE ARE THE REQUIREMENTS:
-    /*
-    1. for each dentry in cwd’s dentries
-    2. compare the name of the dentry with [dirname]
-    3. prompt errors if existing one dentry that has the same
-    name
-    4. if the cluster is full, allocate a new cluster for cwd
-    5. find a free dentry for [dirname]
-    6. allocate a cluster for [dirname]
-    7. init the dentry for [dirname], including name,
-    attributes, clusterHi and clusterLo, etc.
-    */
-}
+void mkdir(bpb_t bpb, const char* new_dir_name) {
+    // 1. Iterate over directory entries in the current working directory
+    // Assuming you have a function to get the first cluster of the current directory.
+     uint32_t current_dir_cluster = get_current_dir_first_cluster();
 
+    // You may need a loop here to go through all clusters of the current directory.
+    // For simplicity, I'm assuming only one cluster for the current directory.
+    uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+    uint32_t dataRegionOffset = ((current_dir_cluster - 2) * clusterSize) +
+                                (bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec) +
+                                (bpb.BPB_RsvdSecCnt * bpb.BPB_BytsPerSec);
+    bool found_space = false;
+    dentry_t *free_dentry = NULL;
+
+    for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
+        dentry_t dentry;
+        ssize_t rd_bytes = pread(img_fd, &dentry, sizeof(dentry_t), dataRegionOffset + i);
+
+        if (rd_bytes != sizeof(dentry_t)) {
+            // Handle error
+            break;
+        }
+
+        // 2. & 3. Check if a directory with the same name already exists
+        if (strncmp(dentry.DIR_Name, new_dir_name, 11) == 0) {
+            printf("Directory with name '%s' already exists.\n", new_dir_name);
+            return;
+        }
+
+        // Check if this dentry is free and remember its location
+        if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == 0xE5) {
+            if (!found_space) {
+                found_space = true;
+                free_dentry = &dentry; // You need to handle this pointer carefully
+            }
+        }
+    }
+
+    // 4. Check if a new cluster needs to be allocated for the current directory
+    if (!found_space) {
+        // Allocate a new cluster and update the current directory's cluster chain
+        // This is a complex operation and depends on your FAT handling implementation
+        // ...
+    }
+
+    // 5. Find a free dentry for the new directory
+    // Assuming 'free_dentry' points to a free directory entry
+
+    // 6. Allocate a cluster for the new directory
+    uint32_t new_dir_cluster = allocate_new_cluster(); // You need to implement this
+
+    // 7. Initialize the directory entry for the new directory
+    if (free_dentry != NULL) {
+        strncpy(free_dentry->DIR_Name, new_dir_name, 11);
+        free_dentry->DIR_Attr = 0x10; // Directory attribute
+        free_dentry->DIR_FstClusHI = (new_dir_cluster >> 16) & 0xFFFF;
+        free_dentry->DIR_FstClusLO = new_dir_cluster & 0xFFFF;
+        free_dentry->DIR_FileSize = 0; // Directories have a file size of 0
+
+        // Write the modified directory entry back to the disk
+	uint32_t write_offset = /* Your logic to calculate the offset */;
+    	ssize_t wr_bytes = pwrite(img_fd, free_dentry, sizeof(dentry_t), write_offset);
+    	if (wr_bytes != sizeof(dentry_t)) {
+        	// Handle error
+        }
+    }
+}
 
 void dbg_print_dentry(dentry_t *dentry) {
     if (dentry == NULL) {
