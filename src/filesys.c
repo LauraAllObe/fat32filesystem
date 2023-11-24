@@ -5,23 +5,25 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdbool.h>
+//#include "mkdir.h"
+//#include "globals.h"
 
 typedef struct __attribute__((packed)) BPB {
-    char BS_jmpBoot[3]; // unnecessary to parse it, use a char array to hold space.
-    char BS_OEMName[8]; // unnecessary to parse it, use a char array to hold space.
-    uint16_t BPB_BytsPerSec; // offset 11, size 2.
-    uint8_t BPB_SecPerClus;
-	uint16_t BPB_RsvdSecCnt;
-	uint8_t BPB_NumFATs;
-	uint16_t BPB_RootEntCnt;
-	uint16_t BPB_TotSec16;
-	uint8_t BPB_Media;
-	uint16_t BPB_FATSz16;
-	uint32_t BPB_FATSz32;
-	uint16_t BPB_SecPerTrk;
-	uint16_t BPB_NumHeads;
-	uint32_t BPB_HiddSec;
-	uint32_t BPB_TotSec32;
+        char BS_jmpBoot[3];
+        char BS_OEMName[8];
+        uint16_t BPB_BytsPerSec;
+        uint8_t BPB_SecPerClus;
+        uint16_t BPB_RsvdSecCnt;
+        uint8_t BPB_NumFATs;
+        uint16_t BPB_RootEntCnt;
+        uint16_t BPB_TotSec16;
+        uint8_t BPB_Media;
+        uint16_t BPB_FATSz16;
+        uint32_t BPB_FATSz32;
+        uint16_t BPB_SecPerTrk;
+        uint16_t BPB_NumHeads;
+        uint32_t BPB_HiddSec;
+        uint32_t BPB_TotSec32;
 } bpb_t;
 
 
@@ -51,7 +53,17 @@ void free_tokens(tokenlist *tokens);
 void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb);
 void print_boot_sector_info(bpb_t bpb);
 void dbg_print_dentry(dentry_t *dentry);
-void mkdir(bpb_t bpb, const char* new);
+//void mkdir(bpb_t bpb, const char* new);
+bpb_t mount_fat32(int img_fd);
+uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset);
+uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb);
+uint32_t allocate_cluster(int fd, bpb_t bpb);
+void extend_cluster_chain(int fd, uint32_t final_clus_num, bpb_t bpb);
+dentry_t *encode_dir_entry(int fat32_fd, uint32_t offset);
+void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset);
+void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb);
+bool is_end_of_file_or_bad_cluster(uint32_t clus_num);
+uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
@@ -62,74 +74,8 @@ char current_path[256] = "/";//UPDATE ON cd
 // the opened files
 // other data structures and global variables you need
 
-//mounts the fat23 image file
-bpb_t mount_fat32(int img_fd) {
-    bpb_t bpb;
-    size_t rd_bytes = pread(img_fd, &bpb, sizeof(bpb_t), 0);
-    if (rd_bytes == -1) {
-        perror("pread failed");
-        close(img_fd);
-        exit(EXIT_FAILURE);
-    }
-    // check if rd_bytes == sizeof(BPB_BytsPerSec)
-    if (rd_bytes != sizeof(bpb_t)) {
-        printf("request %zu bytes, but read %zu bytes\n", sizeof(bpb_t), rd_bytes);
-        close(img_fd);
-        exit(EXIT_FAILURE);
-    }
-    //printf("BPB_BytsPerSec: %u\n", bpb.BPB_BytsPerSec);
-
-    return bpb;
-}
-
-// the offset to the beginning of the file.
-uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset) {
-    uint32_t fat_region_offset = 0x4000;
-    return (offset - fat_region_offset)/4;
-}
-
-uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num) {
-    uint32_t fat_region_offset = 0x4000;
-    return fat_region_offset + clus_num * 4;
-}
-
-// This function returns one directory entry. (PESUDOCODE)
-dentry_t *encode_dir_entry(int fat32_fd, uint32_t offset) {
-    dentry_t *dentry = (dentry_t*)malloc(sizeof(dentry_t));
-    ssize_t rd_bytes = pread(fat32_fd, (void*)dentry, sizeof(dentry_t), offset);
-
-    if (rd_bytes != sizeof(dentry_t)) {
-        // Handle error: The read data size doesn't match the size of a directory entry.
-        free(dentry);
-        return NULL;
-    }
-
-    // Check if the attributes indicate that it's a directory entry
-    if ((dentry->DIR_Attr & 0x08) != 0) {
-        // This is a volume label, not a directory entry
-        free(dentry);
-        return NULL;
-    }
-
-    return dentry;
-}
-
-bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
-    // Define the values that indicate the end of a file and bad clusters in FAT32.
-    uint32_t fat32_end_of_file = 0x0FFFFFFF;
-    uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
-    uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
-
-    // Check if the cluster number falls within the range of bad clusters or is the end of the file.
-    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
-        return true;
-    }
-
-    return false;
-}
-
 //main function (loops) (all the functionality is called or written here)
-void main_process(const char* img_path, bpb_t bpb) {
+void main_process(int img_fd, const char* img_path, bpb_t bpb) {
     while (1) {
         // 0. print prompt and current working directory
         printf("%s%s>",img_path, current_path);
@@ -155,7 +101,7 @@ void main_process(const char* img_path, bpb_t bpb) {
         else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
-            mkdir(bpb, tokens->items[1]);
+            mkdir(img_fd, img_path, bpb, tokens->items[1]);
         // else if cmd is "cd" process_cd();
         // else if cmd is "ls" process_ls();
         // ...
@@ -212,7 +158,7 @@ int main(int argc, char const *argv[])
     }
 
     // 3. main procees
-    main_process(img_path, bpb);
+    main_process(img_fd, img_path, bpb);
 
     // 4. close all opened files
 
@@ -223,73 +169,9 @@ int main(int argc, char const *argv[])
 }
 
 
-void mkdir(bpb_t bpb, const char* new_dir_name) {
-    // 1. Iterate over directory entries in the current working directory
-    // Assuming you have a function to get the first cluster of the current directory.
-     uint32_t current_dir_cluster = get_current_dir_first_cluster();
-
-    // You may need a loop here to go through all clusters of the current directory.
-    // For simplicity, I'm assuming only one cluster for the current directory.
-    uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
-    uint32_t dataRegionOffset = ((current_dir_cluster - 2) * clusterSize) +
-                                (bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec) +
-                                (bpb.BPB_RsvdSecCnt * bpb.BPB_BytsPerSec);
-    bool found_space = false;
-    dentry_t *free_dentry = NULL;
-
-    for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
-        dentry_t dentry;
-        ssize_t rd_bytes = pread(img_fd, &dentry, sizeof(dentry_t), dataRegionOffset + i);
-
-        if (rd_bytes != sizeof(dentry_t)) {
-            // Handle error
-            break;
-        }
-
-        // 2. & 3. Check if a directory with the same name already exists
-        if (strncmp(dentry.DIR_Name, new_dir_name, 11) == 0) {
-            printf("Directory with name '%s' already exists.\n", new_dir_name);
-            return;
-        }
-
-        // Check if this dentry is free and remember its location
-        if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == 0xE5) {
-            if (!found_space) {
-                found_space = true;
-                free_dentry = &dentry; // You need to handle this pointer carefully
-            }
-        }
-    }
-
-    // 4. Check if a new cluster needs to be allocated for the current directory
-    if (!found_space) {
-        // Allocate a new cluster and update the current directory's cluster chain
-        // This is a complex operation and depends on your FAT handling implementation
-        // ...
-    }
-
-    // 5. Find a free dentry for the new directory
-    // Assuming 'free_dentry' points to a free directory entry
-
-    // 6. Allocate a cluster for the new directory
-    uint32_t new_dir_cluster = allocate_new_cluster(); // You need to implement this
-
-    // 7. Initialize the directory entry for the new directory
-    if (free_dentry != NULL) {
-        strncpy(free_dentry->DIR_Name, new_dir_name, 11);
-        free_dentry->DIR_Attr = 0x10; // Directory attribute
-        free_dentry->DIR_FstClusHI = (new_dir_cluster >> 16) & 0xFFFF;
-        free_dentry->DIR_FstClusLO = new_dir_cluster & 0xFFFF;
-        free_dentry->DIR_FileSize = 0; // Directories have a file size of 0
-
-        // Write the modified directory entry back to the disk
-	uint32_t write_offset = /* Your logic to calculate the offset */;
-    	ssize_t wr_bytes = pwrite(img_fd, free_dentry, sizeof(dentry_t), write_offset);
-    	if (wr_bytes != sizeof(dentry_t)) {
-        	// Handle error
-        }
-    }
-}
+//void mkdir(bpb_t bpb, const char* new_dir_name) {
+    //NA
+//}
 
 void dbg_print_dentry(dentry_t *dentry) {
     if (dentry == NULL) {
@@ -339,6 +221,201 @@ void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
             dbg_print_dentry(&dentry);
         }
     }
+}
+
+//mounts the fat23 image file
+bpb_t mount_fat32(int img_fd) {
+    bpb_t bpb;
+    size_t rd_bytes = pread(img_fd, &bpb, sizeof(bpb_t), 0);
+    if (rd_bytes == -1) {
+        perror("pread failed");
+        close(img_fd);
+        exit(EXIT_FAILURE);
+    }
+    // check if rd_bytes == sizeof(BPB_BytsPerSec)
+    if (rd_bytes != sizeof(bpb_t)) {
+        printf("request %zu bytes, but read %zu bytes\n", sizeof(bpb_t), rd_bytes);
+        close(img_fd);
+        exit(EXIT_FAILURE);
+    }
+    //printf("BPB_BytsPerSec: %u\n", bpb.BPB_BytsPerSec);
+
+    return bpb;
+}
+
+// the offset to the beginning of the file.
+uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset) {
+    uint32_t fat_region_offset = 0x4000;
+    return (offset - fat_region_offset)/4;
+}
+
+uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num) {
+    uint32_t fat_region_offset = 0x4000;
+    return fat_region_offset + clus_num * 4;
+}
+
+uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb) {
+    uint32_t data_region_offset = (clus_num - 2) * bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+    return data_region_offset;
+}
+
+// returns the free cluster number
+uint32_t allocate_cluster(int fd, bpb_t bpb) {
+    /*uint32_t fat_region = 0x4000;
+    uint32_t min_clus_num = 2;
+    uint32_t max_clus_num = 1009;
+    uint32_t clus_clus_num = min_clus_num;
+    uint32_t next_clus_num = 0xffffffff;
+    
+    while (clus_clus_num != 0) {
+	uint32_t offset = convert_clus_num_to_offset_in_fat_region(clus_clus_num);
+        pread(fd, &next_clus_num, sizeof(uint32_t), offset);
+        if (next_clus_num == 0) {
+            // current cluster number is free.
+            return clus_clus_num;
+        } else {
+            // check the next cluster number
+            ++ clus_clus_num;
+        }
+    }
+    // no free cluster found.
+    return 0;*/
+    uint32_t fat_region_offset = bpb.BPB_RsvdSecCnt * bpb.BPB_BytsPerSec;
+    uint32_t fat_entry_size = 4; // Each FAT entry is 4 bytes for FAT32
+
+    for (uint32_t i = 2; i < bpb.BPB_FATSz32; i++) {
+        uint32_t offset = fat_region_offset + i * fat_entry_size;
+        uint32_t fat_entry;
+        ssize_t read_bytes = pread(fd, &fat_entry, sizeof(uint32_t), offset);
+
+        if (read_bytes != sizeof(uint32_t)) {
+            // Handle error reading FAT entry
+            return 0;
+        }
+
+        if (fat_entry == 0) {
+            // Found a free cluster
+            return i;
+        }
+    }
+
+    // No free cluster found
+    return 0;
+}
+
+// add a new cluster to the cluster chain.
+void extend_cluster_chain(int fd, uint32_t final_clus_num, bpb_t bpb) {
+    // get a free cluster number
+    uint32_t new_clus_num = allocate_cluster(fd, bpb);
+
+    // set the new custer as the final cluster of a file.
+    uint32_t offset = convert_clus_num_to_offset_in_fat_region(new_clus_num);
+    uint32_t end_of_file = 0xffffffff;
+    pwrite(fd, &end_of_file, sizeof(uint32_t), offset);
+
+    // update the cluster chain by updating the old final cluster.
+    offset = convert_clus_num_to_offset_in_fat_region(final_clus_num);
+    pwrite(fd, &new_clus_num, sizeof(uint32_t), offset);
+}
+
+// This function returns one directory entry. (PESUDOCODE)
+dentry_t *encode_dir_entry(int fat32_fd, uint32_t offset) {
+    dentry_t *dentry = (dentry_t*)malloc(sizeof(dentry_t));
+    ssize_t rd_bytes = pread(fat32_fd, (void*)dentry, sizeof(dentry_t), offset);
+
+    if (rd_bytes != sizeof(dentry_t)) {
+        // Handle error: The read data size doesn't match the size of a directory entry.
+        free(dentry);
+        return NULL;
+    }
+
+    // Check if the attributes indicate that it's a directory entry
+    if ((dentry->DIR_Attr & 0x08) != 0) {
+        // This is a volume label, not a directory entry
+        free(dentry);
+        return NULL;
+    }
+
+    return dentry;
+}
+
+// This is just an example and pseudocode. The real logic may different from
+// what is shown here.
+// This function writes the dentry to the offset.
+void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
+    uint32_t wr_bytes = pwrite(fd, dentry, sizeof(dentry_t), offset);
+    // omitted: check wr_bytes == sizeof(dentry_t)
+
+    return dentry;
+}
+
+// This is just an example and pseudocode. The real logic may different from
+// what is shown here.
+// This function appends a dentry to the cluster in the data region.
+void append_dir_entry(int img_fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb) {
+    uint32_t curr_clus_num = clus_num;
+    uint32_t next_clus_num = 0;
+    //uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
+    //uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num);
+    uint32_t data_region_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num, bpb);
+    uint32_t data_region_size = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+
+    while (curr_clus_num < 0x0FFFFFF8) {
+        // Check if the current cluster is full
+        if (data_region_offset >= data_region_size) {
+            // Allocate a new cluster and extend the cluster chain
+            uint32_t new_cluster = allocate_cluster(img_fd, bpb);
+            if (new_cluster == 0) {
+                // Handle error: No free cluster available
+                return;
+            }
+
+            // Update the FAT to link the new cluster
+            uint32_t fat_region_offset = bpb.BPB_RsvdSecCnt * bpb.BPB_BytsPerSec;
+            uint32_t fat_entry_offset = fat_region_offset + curr_clus_num * 4;
+            pwrite(img_fd, &new_cluster, sizeof(uint32_t), fat_entry_offset);
+
+            // Update next cluster and reset data_region_offset
+            curr_clus_num = new_cluster;
+            data_region_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num, bpb);
+        }
+
+        // Check if the directory entry is free in the current cluster
+        dentry_t existing_dentry;
+        ssize_t read_bytes = pread(img_fd, &existing_dentry, sizeof(dentry_t), data_region_offset);
+
+        if (read_bytes != sizeof(dentry_t)) {
+            // Handle error reading directory entry
+            return;
+        }
+
+        if (existing_dentry.DIR_Name[0] == 0xE5 || existing_dentry.DIR_Name[0] == 0x00) {
+            // Found a free or deleted directory entry, write the new entry
+            pwrite(img_fd, new_dentry, sizeof(dentry_t), data_region_offset);
+            return;
+        }
+
+        // Move to the next directory entry in the cluster
+        data_region_offset += sizeof(dentry_t);
+    }
+
+    // Handle error: No available directory entry in the cluster chain
+    return;
+
+}
+
+bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
+    // Define the values that indicate the end of a file and bad clusters in FAT32.
+    uint32_t fat32_end_of_file = 0x0FFFFFFF;
+    uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
+    uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
+
+    // Check if the cluster number falls within the range of bad clusters or is the end of the file.
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
+        return true;
+    }
+
+    return false;
 }
 
 //GETS THE INPUT FROM THE COMMAND LINE
