@@ -52,15 +52,85 @@ void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb);
 void print_boot_sector_info(bpb_t bpb);
 void dbg_print_dentry(dentry_t *dentry);
 void mkdir(bpb_t bpb, const char* new);
+//FUNCTIONS DECLARATION FOR PART 4
+void openFile(const char* filename, const char* mode);
+void closeFile(const char* filename);
+void listOpenFiles();
+void seekFile(const char* filename, uint32_t offset);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
 // e.g., 
 // the opened fat32.img file
 // the current working directory
+
+//PART 4
+typedef struct {
+    char filename[256]; // Adjust size as needed
+    char mode[3];       // Store "-r", "-w", "-rw", or "-wr"
+    uint32_t offset;    // Offset in the file
+} OpenFile;
+
+#define MAX_OPEN_FILES 100  // Maximum number of open files at a time
+
+OpenFile openFiles[MAX_OPEN_FILES];  // Global array for open files
+
+
 char current_path[256] = "/";//UPDATE ON cd
 // the opened files
 // other data structures and global variables you need
+
+// Read function implementation (PART 4)
+void read_file(const char* filename, uint32_t size) {
+    // Check if file is open and in read mode
+    bool fileIsOpen = false;
+    int fileIndex = -1;
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, filename) == 0) {
+            fileIsOpen = true;
+            fileIndex = i;
+            break;
+        }
+    }
+
+    if (!fileIsOpen) {
+        printf("Error: File '%s' is not open.\n", filename);
+        return;
+    }
+
+    if (strstr(openFiles[fileIndex].mode, "r") == NULL) {
+        printf("Error: File '%s' is not opened in read mode.\n", filename);
+        return;
+    }
+
+    // Buffer to store read data
+    char *buffer = malloc(size);
+    if (buffer == NULL) {
+        printf("Error: Memory allocation failed.\n");
+        return;
+    }
+
+    // Calculate the actual offset in the FAT32 image
+    // This involves FAT32 file system specifics, like cluster chains
+    uint32_t actual_offset = ...; // Calculate based on file's position in FAT32
+
+    // Read data from the file using pread
+    ssize_t bytes_read = pread(img_fd, buffer, size, actual_offset);
+
+    if (bytes_read == -1) {
+        perror("Error reading file");
+        free(buffer);
+        return;
+    }
+
+    // Process the read data (e.g., print it, manipulate it, etc.)
+
+    // Update the file offset in openFiles array
+    openFiles[fileIndex].offset += bytes_read;
+
+    free(buffer);
+}
+
 
 //mounts the fat23 image file
 bpb_t mount_fat32(int img_fd) {
