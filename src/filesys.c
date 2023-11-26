@@ -80,6 +80,14 @@ char current_path[256] = "/";//UPDATE ON cd
 // the opened files
 // other data structures and global variables you need
 
+// Find the starting cluster of the file (part 4)
+uint32_t find_starting_cluster(const char* filename) {
+    // Pseudocode for finding the starting cluster
+    // 1. Search through the directory entries in the current directory.
+    // 2. If you find an entry with the given filename, extract the starting cluster.
+    // 3. Return the starting cluster number.
+}
+
 // Read function implementation (PART 4)
 void read_file(const char* filename, uint32_t size) {
     // Check if file is open and in read mode
@@ -110,21 +118,39 @@ void read_file(const char* filename, uint32_t size) {
         return;
     }
 
+    // Calculate the starting cluster of the file (not implemented yet)
+    uint32_t startCluster = find_starting_cluster(filename); // calling function
+
+    // Calculate which cluster the logical offset corresponds to
+    uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+    uint32_t logicalOffset = openFiles[fileIndex].offset;
+    uint32_t clusterOffset = logicalOffset / clusterSize;
+    uint32_t intraClusterOffset = logicalOffset % clusterSize;
+
+    // Follow the cluster chain to find the correct cluster
+    uint32_t currentCluster = startCluster;
+    for (uint32_t i = 0; i < clusterOffset; ++i) {
+        currentCluster = getNextClusterFromFAT(currentCluster);
+        // Add checks for end-of-file or bad cluster
+    }
+
     // Calculate the actual offset in the FAT32 image
     // This involves FAT32 file system specifics, like cluster chains
-    uint32_t actual_offset = ...; // Calculate based on file's position in FAT32
+    uint32_t actual_offset = (currentCluster - 2) * clusterSize + ...; // Calculate based on file's position in FAT32
+    actual_offset += intraClusterOffset;
 
     // Read data from the file using pread
     ssize_t bytes_read = pread(img_fd, buffer, size, actual_offset);
-
     if (bytes_read == -1) {
         perror("Error reading file");
         free(buffer);
         return;
     }
 
-    // Process the read data (e.g., print it, manipulate it, etc.)
-
+    // Process and output the read data
+    // For example, print the buffer contents
+    // fwrite(buffer, 1, bytes_read, stdout);
+    
     // Update the file offset in openFiles array
     openFiles[fileIndex].offset += bytes_read;
 
