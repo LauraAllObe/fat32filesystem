@@ -60,9 +60,9 @@ uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num);
 uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset);
 uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num);
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset);
-void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num);
+void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb);
 uint32_t alloca_cluster(int fd);
-void extend_cluster_chain(int fd, uint32_t final_clus_num);
+void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name);
@@ -107,18 +107,18 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         else if(strcmp(tokens->items[0], "cd") == 0 && tokens->size > 2)
             printf("cd command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "cd") == 0)
-            if(!is_valid_path(fd_img,bpb,tokens->items[1]))
+            if(!is_valid_path(img_fd,bpb,tokens->items[1]))
                 printf("%s does not exist\n", tokens->items[1]);
         else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
-            if(!is_directory(fd_img, bpb, tokens->items[1]))
-                new_directory(img_fd, img_path, bpb, tokens->items[1]);
+            if(!is_directory(img_fd, bpb, tokens->items[1]))
+                new_directory(img_fd, bpb, tokens->items[1]);
         else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size > 2)
             printf("creat command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
-            if(!is_file(fd_img, bpb, tokens->items[1]))
-                new_file(img_fd, img_path, bpb, tokens->items[1]);
+            if(!is_file(img_fd, bpb, tokens->items[1]))
+                new_file(img_fd, bpb, tokens->items[1]);
         // else if cmd is ...
         // ...
         
@@ -358,7 +358,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
     }
 
     if (!is_8_3_format(upper_file_name)) {
-        printf("%s is not in fat32 8.3 format", dir_name);
+        printf("%s is not in fat32 8.3 format", file_name);
         return true; // Return true if not in 8.3 format
     }
 
