@@ -435,6 +435,8 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new directory\n");
         return;
+    } else {
+        printf("Allocated cluster number for new directory: %u\n", free_cluster);
     }
 
     // Create a directory entry for the new directory
@@ -448,6 +450,8 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Find the location of the current directory and append the new directory entry
     uint32_t current_dir_cluster = directory_location(fd_img, bpb);
     append_dir_entry(fd_img, &new_dir_entry, current_dir_cluster, bpb);
+
+    printf("Appended new directory entry.\n");
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
