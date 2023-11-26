@@ -109,6 +109,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             if(!is_valid_path(img_fd,bpb,tokens->items[1]))
                 printf("%s does not exist\n", tokens->items[1]);
         }
+        else if(strcmp(tokens->items[0], "ls") == 0 && tokens->size > 1)
+            printf("ls command does not take any arguments\n");
+        else if (strcmp(tokens->items[0], "ls") == 0)
+            list_content(img_fd, bpb);
         else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
@@ -219,6 +223,7 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
     // Normalize the path (handle '.' and '..')
     char *token;
     char *tokens[256];
+    char final_path[256] = "";
     int token_count = 0;
     token = strtok(temp_path, "/");
     while (token != NULL) {
@@ -226,7 +231,8 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
             // Current directory, do nothing
         } else if (strcmp(token, "..") == 0) {
             // Parent directory, go one level up
-            if (token_count > 0) token_count--;
+            if(token_count == 1) final_path == "/";
+            else if (token_count > 0) token_count--;
         } else {
             // Regular directory, add it to the path
             if (token_count < 256) {
@@ -243,9 +249,11 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
             strcat(absolute_path, tokens[i]);
             if (i < token_count - 1) strcat(absolute_path, "/");
         }
-
     // Temporarily update current_path
-    strncpy(current_path, absolute_path, sizeof(current_path));
+    if(strcmp(final_path, "/") == 0)
+        strncpy(current_path, final_path, sizeof(current_path));
+    else
+        strncpy(current_path, absolute_path, sizeof(current_path));
 
     // Check if it's a valid directory
     uint32_t cluster_num = directory_location(fd_img, bpb);
