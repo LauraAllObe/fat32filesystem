@@ -208,12 +208,12 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
     strncpy(original_path, current_path, sizeof(original_path)); // Save the current path
 
     char temp_path[256];
+    // Check if the path is absolute or relative
     if (path[0] == '/') {
-        // Absolute path
         strncpy(temp_path, path, sizeof(temp_path));
     } else {
-        // Relative path
-        snprintf(temp_path, sizeof(temp_path), "%s%s", current_path, path);
+        // For relative path, concatenate with current_path
+        snprintf(temp_path, sizeof(temp_path), "%s/%s", current_path, path);
     }
 
     // Normalize the path (handle '.' and '..')
@@ -228,7 +228,10 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
             // Parent directory, go one level up
             if (token_count > 0) token_count--;
         } else {
-            tokens[token_count++] = token;
+            // Ensure we don't exceed the array bounds
+            if (token_count < 256) {
+                tokens[token_count++] = token;
+            }
         }
         token = strtok(NULL, "/");
     }
@@ -236,8 +239,8 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
     // Reconstruct the absolute path
     char absolute_path[256] = "/";
     for (int i = 0; i < token_count; i++) {
-        if (i > 0) strcat(absolute_path, "/");
         strcat(absolute_path, tokens[i]);
+        if (i < token_count - 1) strcat(absolute_path, "/");
     }
 
     // Temporarily update current_path
@@ -250,7 +253,6 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
         return false; // Not a valid directory
     }
 
-    // Keep the updated path in current_path as it's valid
     return true;
 }
 
