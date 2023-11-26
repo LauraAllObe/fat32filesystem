@@ -155,7 +155,7 @@ int main(int argc, char const *argv[])
     }
     // 1. open the fat32.img
     const char *img_path = argv[1];
-    int img_fd = open(img_path, O_RDONLY);
+    int img_fd = open(img_path, O_RDWR);
     if (img_fd == -1) {
         perror("open failed");
         return EXIT_FAILURE;
