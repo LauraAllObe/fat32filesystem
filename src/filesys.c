@@ -288,7 +288,9 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
                 token_count--;
                 if(token_count == 0)
                 {
-                    current_path = "/";
+                    strncpy(current_path, "/", sizeof(current_path));
+                    current_path[sizeof(current_path) - 1] = '\0'; // Add null terminator
+
                     return true;
                 }
             }
