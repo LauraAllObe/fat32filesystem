@@ -544,6 +544,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     for (int i = 0; upper_dir_name[i] != '\0'; i++) {
         upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
     }
+
     // Allocate a cluster for the new directory
     uint32_t free_cluster = alloca_cluster(fd_img);
     if (free_cluster == 0) {
@@ -553,12 +554,14 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
-    strncpy(new_dir_entry.DIR_Name, dir_name, 11); // Copy dir_name to DIR_Name
+    strncpy(new_dir_entry.DIR_Name, upper_dir_name, 11);
     new_dir_entry.DIR_Attr = 0x10; // Directory attribute
     new_dir_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
     new_dir_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
     new_dir_entry.DIR_FileSize = 0; // A directory's size is 0
-    // Find the location of the current directory and append the new directory entry
+
+    // Find the location of the parent directory and append the new directory entry
+    uint32_t parent_dir_cluster;
     if (strcmp(current_path, "/") == 0) {
         parent_dir_cluster = bpb.BPB_RootClus; // Use root cluster if in root directory
     } else {
