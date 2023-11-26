@@ -249,16 +249,13 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
 
     // Reconstruct the absolute path
     char absolute_path[256] = "/";
-    if(token_count > 0)
+    if(token_count > 0 && strcmp(final_path, "/") != 0)
         for (int i = 0; i < token_count; i++) {
             strcat(absolute_path, tokens[i]);
             if (i < token_count - 1) strcat(absolute_path, "/");
         }
     // Temporarily update current_path
-    if(strcmp(final_path, "/") == 0)
-        strncpy(current_path, final_path, sizeof(current_path));
-    else
-        strncpy(current_path, absolute_path, sizeof(current_path));
+    strncpy(current_path, absolute_path, sizeof(current_path));
 
     // Check if it's a valid directory
     uint32_t cluster_num = directory_location(fd_img, bpb);
