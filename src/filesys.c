@@ -168,8 +168,8 @@ int main(int argc, char const *argv[])
 
         offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
         pread(img_fd, &next_clus_num, sizeof(uint32_t), offset);
-        printf("current cluster number: %u, next cluster number: %u\n", \
-                curr_clus_num, next_clus_num);
+        //printf("current cluster number: %u, next cluster number: %u\n", \
+                //curr_clus_num, next_clus_num);
         curr_clus_num = next_clus_num;
     }
 
@@ -418,6 +418,7 @@ bool is_8_3_format(const char* name) {
         } else {
             name_len++;
             if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8)) {
+                printf("not in 8.3 format\n");
                 return false; // Extension or name part too long
             }
         }
