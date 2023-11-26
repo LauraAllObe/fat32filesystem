@@ -5,8 +5,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdbool.h>
-//#include "mkdir.h"
-//#include "globals.h"
 
 typedef struct __attribute__((packed)) BPB {
         char BS_jmpBoot[3];
@@ -134,6 +132,9 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             }
             else
                 printf("file exists\n");
+        }
+        for (int i = 0; i < tokens->size; i++) {
+            printf("token [%d]: %s\n", i, tokens->items[i]);
         }
         // else if cmd is ...
         // ...
