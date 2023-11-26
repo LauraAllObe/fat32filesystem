@@ -366,7 +366,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-    printf("no directory with the name %s found", upper_dir_name)
+    printf("no directory with the name %s found", upper_dir_name);
     return false;
 }
 
