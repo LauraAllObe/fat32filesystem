@@ -209,7 +209,15 @@ int main(int argc, char const *argv[])
 }
 
 void list_content(int img_fd, bpb_t bpb) {
-    uint32_t clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
+    uint32_t clusterNum;
+
+    // Special handling for root directory
+    if (strcmp(current_path, "/") == 0) {
+        clusterNum = bpb.BPB_RootClus; // The root cluster number is in the BPB
+    } else {
+        clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
+    }
+
     if (clusterNum == 0) {
         printf("Error: Current directory not found.\n");
         return;
@@ -220,6 +228,11 @@ void list_content(int img_fd, bpb_t bpb) {
     uint32_t nextClusterNum;
     char buffer[clusterSize];
     dentry_t *dirEntry;
+
+    // Print '.' and '..' for non-root directories
+    if (strcmp(current_path, "/") != 0) {
+        printf(".\n..\n");
+    }
 
     do {
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(clusterNum);
