@@ -114,11 +114,15 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         else if (strcmp(tokens->items[0], "mkdir") == 0)
             if(!is_directory(img_fd, bpb, tokens->items[1]))
                 new_directory(img_fd, bpb, tokens->items[1]);
+            else
+                prinf("directory exists\n")
         else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size > 2)
             printf("creat command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
             if(!is_file(img_fd, bpb, tokens->items[1]))
                 new_file(img_fd, bpb, tokens->items[1]);
+            else
+                prinf("file exists\n")
         // else if cmd is ...
         // ...
         
