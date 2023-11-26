@@ -720,6 +720,8 @@ bpb_t mount_fat32(int img_fd) {
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
     printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
+    bpb.BPB_RootClus = 2;
+    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
 
     return bpb;
 }
