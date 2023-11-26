@@ -430,7 +430,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Assuming a function that does this conversion
 
     // Allocate a cluster for the new directory
-    uint32_t free_cluster = alloc_cluster(fd_img);
+    uint32_t free_cluster = alloca_cluster(fd_img);
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new directory\n");
         return;
@@ -454,7 +454,7 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
     // Assuming a function that does this conversion
 
     // Allocate a cluster for the new file
-    uint32_t free_cluster = alloc_cluster(fd_img);
+    uint32_t free_cluster = alloca_cluster(fd_img);
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new file\n");
         return;
@@ -512,7 +512,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
         pread(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
 
         if (next_clus_num == 0xFFFFFFFF) {
-            next_clus_num = alloc_cluster(fd);
+            next_clus_num = alloca_cluster(fd);
             pwrite(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
             curr_clus_num = next_clus_num;
         } else {
@@ -644,7 +644,7 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 
         // Write the updated directory entry back to the disk
         // Assuming a function write_dentry() that writes the directory entry at the correct location
-        write_dentry(fd, dentry_ptr);
+        write_dir_dentry(fd, dentry_ptr);
     } else {
         // The file or directory already has clusters. Extend the chain.
         uint32_t final_clus_num = *current_clus_num_ptr;
