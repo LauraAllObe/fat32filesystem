@@ -68,6 +68,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name);
 bool is_8_3_format(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
+void list_content(int img_fd, bpb_t bpb);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
@@ -205,6 +206,10 @@ int main(int argc, char const *argv[])
     close(img_fd);
 
     return 0;
+}
+
+void list_content(int img_fd, bpb_t bpb) {
+    //empty list content function
 }
 
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
