@@ -240,6 +240,7 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
 }
 
 uint32_t directory_location(int fd_img, bpb_t bpb) {
+    printf("4\n");
     uint32_t clusterNum = bpb.BPB_RootClus;
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
@@ -292,6 +293,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
     }
 
     free(full_path_copy);
+    printf("5\n");
     return clusterNum;
 }
 
@@ -433,7 +435,7 @@ bool is_8_3_format(const char* name) {
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Convert dir_name to FAT32 8.3 format
     // Assuming a function that does this conversion
-
+    printf("1\n");
     // Allocate a cluster for the new directory
     uint32_t free_cluster = alloca_cluster(fd_img);
     if (free_cluster == 0) {
@@ -442,7 +444,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     } else {
         printf("Allocated cluster number for new directory: %u\n", free_cluster);
     }
-
+    printf("2\n");
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
     strncpy(new_dir_entry.DIR_Name, dir_name, 11); // Copy dir_name to DIR_Name
@@ -450,9 +452,10 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     new_dir_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
     new_dir_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
     new_dir_entry.DIR_FileSize = 0; // A directory's size is 0
-
+    printf("3\n");
     // Find the location of the current directory and append the new directory entry
     uint32_t current_dir_cluster = directory_location(fd_img, bpb);
+    printf("6\n");
     append_dir_entry(fd_img, &new_dir_entry, current_dir_cluster, bpb);
 
     printf("Appended new directory entry.\n");
@@ -495,7 +498,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     uint32_t bytesProcessed = 0;
-
+    printf("7\n");
     while (curr_clus_num != 0xFFFFFFFF) {
         uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num);
 
@@ -508,13 +511,15 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             }
 
             if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == 0xE5) {
+                printf("writing here\n");
                 write_dir_entry(fd, new_dentry, data_offset + bytesProcessed);
+                printf("wrote dir entry\n");
                 return;
             }
 
             bytesProcessed += sizeof(dentry_t);
         }
-
+        printf("8\n");
         // Reset for the next cluster
         bytesProcessed = 0;
         uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
@@ -528,6 +533,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             curr_clus_num = next_clus_num;
         }
     }
+    printf("9\n");
 }
 
 void dbg_print_dentry(dentry_t *dentry) {
