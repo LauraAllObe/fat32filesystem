@@ -169,9 +169,11 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
     uint32_t clusterNum = bpb.BPB_RootClus;
     char buffer[11];
     dentry_t *dirEntry;
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
 
     char *token;
-    char *full_path_copy = strdup(full_path); // Copy full_path to avoid modifying the original string
+    char *full_path_copy = strdup(current_path); // Copy full_path to avoid modifying the original string
     token = strtok(full_path_copy, "/");
 
     while (token != NULL) {
