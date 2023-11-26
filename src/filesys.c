@@ -114,10 +114,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
             printf("here!!\n");
-            if(!is_directory(img_fd, bpb, tokens->items[1]))
+            if(is_directory(img_fd, bpb, tokens->items[1]) == false)
             {
-                new_directory(img_fd, bpb, tokens->items[1]);
                 printf("directory doesn't exist\n");
+                new_directory(img_fd, bpb, tokens->items[1]);
             }
             else
                 printf("directory exists\n");
@@ -127,10 +127,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         else if (strcmp(tokens->items[0], "creat") == 0)
         {
             printf("here!!!\n");
-            if(!is_file(img_fd, bpb, tokens->items[1]))
+            if(is_file(img_fd, bpb, tokens->items[1]) == false)
             {
-                new_file(img_fd, bpb, tokens->items[1]);
                 printf("file doesn't exist\n");
+                new_file(img_fd, bpb, tokens->items[1]);
             }
             else
                 printf("file exists\n");
@@ -316,6 +316,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     for (int i = 0; upper_dir_name[i] != '\0'; i++) {
         upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
     }
+    printf("Upper directory name: %s\n", upper_dir_name);
 
     if (!is_8_3_format(upper_dir_name)) {
         printf("%s is not in fat32 8.3 format", dir_name);
@@ -323,6 +324,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     }
 
     uint32_t clusterNum = directory_location(fd_img, bpb);
+    printf("Directory cluster number %u\n", clusterNum);
     uint32_t nextClusterNum;
     uint32_t dirEntrySize = sizeof(dentry_t);
     uint32_t bufferSize = bpb.BPB_BytsPerSec * bpb.BPB_SecPerClus;
@@ -341,6 +343,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += dirEntrySize) {
+            printf("in loop to traverse current cluster\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
@@ -350,20 +353,20 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
             // Skip deleted entries and check for directory name match
             if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, dir_name, 11) == 0 && 
+                strncmp(dirEntry->DIR_Name, upper_dir_name, 11) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
                 printf("directory exists\n");
                 return true;
             }
         }
-
+        printf("moving on to next cluster\n");
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
         pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-
+    printf("no directory with the name %s found", upper_dir_name)
     return false;
 }
 
