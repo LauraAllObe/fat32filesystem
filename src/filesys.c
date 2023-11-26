@@ -529,9 +529,12 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             }
 
             if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == 0xE5) {
-                printf("writing here\n");
-                write_dir_entry(fd, new_dentry, data_offset + bytesProcessed);
-                printf("wrote dir entry\n");
+                ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
+                if (wr_bytes != sizeof(dentry_t)) {
+                    printf("Failed to write directory entry\n");
+                    return;  // Add return here to exit the function if write fails
+                }
+                printf("Successfully wrote directory entry\n");
                 return;
             }
 
