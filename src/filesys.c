@@ -644,7 +644,7 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 
         // Write the updated directory entry back to the disk
         // Assuming a function write_dentry() that writes the directory entry at the correct location
-        write_dir_dentry(fd, dentry_ptr);
+        write_dir_entry(fd, dentry_ptr);
     } else {
         // The file or directory already has clusters. Extend the chain.
         uint32_t final_clus_num = *current_clus_num_ptr;
