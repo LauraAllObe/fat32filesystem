@@ -209,7 +209,59 @@ int main(int argc, char const *argv[])
 }
 
 void list_content(int img_fd, bpb_t bpb) {
-    //empty list content function
+    uint32_t clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
+    if (clusterNum == 0) {
+        printf("Error: Current directory not found.\n");
+        return;
+    }
+
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    uint32_t nextClusterNum;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
+
+    do {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(clusterNum);
+        ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+
+        if (bytesRead <= 0) {
+            printf("Error reading directory entries.\n");
+            return;
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+
+            // End of directory entries marker
+            if (dirEntry->DIR_Name[0] == 0x00) {
+                break;
+            }
+
+            // Skip deleted entries
+            if (dirEntry->DIR_Name[0] == 0xE5) {
+                continue;
+            }
+
+            // Print directory entry name
+            char name[12];
+            memcpy(name, dirEntry->DIR_Name, 11);
+            name[11] = '\0';
+
+            // Check if it is a directory and apply blue color
+            if (dirEntry->DIR_Attr & 0x10) {
+                printf("\033[34m%s\033[0m\n", name);  // Blue text for directories
+            } else {
+                printf("%s\n", name);  // Default text color for files
+            }
+        }
+
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+        pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
+        clusterNum = nextClusterNum;
+
+    } while (!is_end_of_file_or_bad_cluster(clusterNum));
 }
 
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
@@ -234,6 +286,11 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
             // Navigate one directory up
             if (token_count > 0) {
                 token_count--;
+                if(token_count == 0)
+                {
+                    current_path = "/";
+                    return true;
+                }
             }
         } else {
             tokens[token_count++] = token; // Add directory to the path
