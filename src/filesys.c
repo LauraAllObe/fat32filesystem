@@ -238,10 +238,11 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
 
     // Reconstruct the absolute path
     char absolute_path[256] = "/";
-    for (int i = 0; i < token_count; i++) {
-        strcat(absolute_path, tokens[i]);
-        if (i < token_count - 1) strcat(absolute_path, "/");
-    }
+    if(token_count > 0)
+        for (int i = 0; i < token_count; i++) {
+            strcat(absolute_path, tokens[i]);
+            if (i < token_count - 1) strcat(absolute_path, "/");
+        }
 
     // Temporarily update current_path
     strncpy(current_path, absolute_path, sizeof(current_path));
