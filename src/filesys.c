@@ -218,54 +218,49 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
 
     char temp_path[256];
     if (path[0] == '/') {
-        // Absolute path
-        strncpy(temp_path, path, sizeof(temp_path));
+        strncpy(temp_path, path, sizeof(temp_path)); // Absolute path
     } else {
-        // Relative path
-        snprintf(temp_path, sizeof(temp_path), "%s/%s", current_path, path);
+        snprintf(temp_path, sizeof(temp_path), "%s/%s", current_path, path); // Relative path
     }
 
-    // Normalize the path (handle '.' and '..')
     char *token;
     char *tokens[256];
-    char final_path[256] = "";
     int token_count = 0;
     token = strtok(temp_path, "/");
     while (token != NULL) {
         if (strcmp(token, ".") == 0) {
-            // Current directory, do nothing
+            // Do nothing for current directory reference
         } else if (strcmp(token, "..") == 0) {
-            // Parent directory, go one level up
-            if(token_count == 1) final_path == "/";
-            else if (token_count > 0) token_count--;
-        } else {
-            // Regular directory, add it to the path
-            if (token_count < 256) {
-                tokens[token_count++] = token;
+            // Navigate one directory up
+            if (token_count > 0) {
+                token_count--;
             }
+        } else {
+            tokens[token_count++] = token; // Add directory to the path
         }
         token = strtok(NULL, "/");
     }
 
-    // Reconstruct the absolute path
     char absolute_path[256] = "/";
-    if(token_count > 0 && strcmp(final_path, "/") != 0)
-        for (int i = 0; i < token_count; i++) {
-            strcat(absolute_path, tokens[i]);
-            if (i < token_count - 1) strcat(absolute_path, "/");
+    for (int i = 0; i < token_count; i++) {
+        strcat(absolute_path, tokens[i]);
+        if (i < token_count - 1) {
+            strcat(absolute_path, "/");
         }
-    // Temporarily update current_path
-    strncpy(current_path, absolute_path, sizeof(current_path));
+    }
 
-    // Check if it's a valid directory
+    strncpy(current_path, absolute_path, sizeof(current_path)); // Update current_path
+
+    // Check if the directory exists
     uint32_t cluster_num = directory_location(fd_img, bpb);
     if (cluster_num == 0) {
-        strncpy(current_path, original_path, sizeof(current_path)); // Restore original path
-        return false; // Not a valid directory
+        strncpy(current_path, original_path, sizeof(current_path)); // Restore original path if not valid
+        return false;
     }
 
     return true;
 }
+
 
 uint32_t directory_location(int fd_img, bpb_t bpb) {
     printf("4\n");
