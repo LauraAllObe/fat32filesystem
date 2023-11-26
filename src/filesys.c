@@ -234,9 +234,10 @@ void list_content(int img_fd, bpb_t bpb) {
     if (strcmp(current_path, "/") != 0) {
         printf(".\n..\n");
     }
+    bool endOfDirectoryReached = false;
 
     do {
-        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(clusterNum);
+        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -249,6 +250,7 @@ void list_content(int img_fd, bpb_t bpb) {
 
             // End of directory entries marker
             if (dirEntry->DIR_Name[0] == 0x00) {
+                endOfDirectoryReached = true;
                 break;
             }
 
@@ -275,7 +277,7 @@ void list_content(int img_fd, bpb_t bpb) {
         pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
         clusterNum = nextClusterNum;
 
-    } while (!is_end_of_file_or_bad_cluster(clusterNum));
+    } while (!is_end_of_file_or_bad_cluster(clusterNum) && !endOfDirectoryReached);
 }
 
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
