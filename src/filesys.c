@@ -662,9 +662,9 @@ uint32_t alloca_cluster(int fd) {
             perror("Error reading FAT entry");
             return 0; // Indicate failure
         }
-        
-        printf("Allocating cluster. Current cluster number: %u, FAT entry: %u\n", 
-               clus_clus_num, next_clus_num);
+        if(clus_clus_num < 90)
+            printf("Allocating cluster. Current cluster number: %u, FAT entry: %u\n", 
+                clus_clus_num, next_clus_num);
 
         // Check if the cluster is free
         if (next_clus_num == 0) {
