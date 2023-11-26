@@ -351,6 +351,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
             // End of directory marker
             if (dirEntry->DIR_Name[0] == 0x00) {
+                printf("no directory with the name %s found", upper_dir_name);
                 return false;
             }
 
@@ -476,7 +477,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     printf("6\n");
     append_dir_entry(fd_img, &new_dir_entry, current_dir_cluster, bpb);
 
-    printf("Appended new directory entry.\n");
+    printf("end of append new directory entry function.\n");
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
@@ -506,7 +507,9 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
     ssize_t wr_bytes = pwrite(fd, dentry, sizeof(dentry_t), offset);
     if (wr_bytes != sizeof(dentry_t)) {
-        printf("could not write directory entry\n");
+        perror("Error writing directory entry"); // Print the system error message
+        printf("Failed to write directory entry at offset: %u\n", offset);
+        printf("Bytes attempted to write: %zu, Bytes written: %zd\n", sizeof(dentry_t), wr_bytes);
     }
 }
 
@@ -532,6 +535,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
+                    printf("Appending directory entry. Cluster number: %u, Sector size: %u, Cluster size: %u\n", curr_clus_num, sectorSize, clusterSize);
                     return;  // Add return here to exit the function if write fails
                 }
                 printf("Successfully wrote directory entry\n");
@@ -652,6 +656,8 @@ uint32_t alloca_cluster(int fd) {
     while (clus_clus_num <= max_clus_num) {
         uint32_t offset = convert_clus_num_to_offset_in_fat_region(clus_clus_num);
         pread(fd, &next_clus_num, sizeof(uint32_t), offset);
+        printf("Allocating cluster. Current cluster number: %u, Next cluster number: %u\n", 
+           clus_clus_num, next_clus_num);
         if (next_clus_num == 0) {
             uint32_t end_of_chain = 0xFFFFFFFF;
             pwrite(fd, &end_of_chain, sizeof(uint32_t), offset);  // Mark the cluster as used
