@@ -215,6 +215,8 @@ void list_content(int img_fd, bpb_t bpb) {
     if (strcmp(current_path, "/") == 0) {
         clusterNum = bpb.BPB_RootClus; // The root cluster number is in the BPB
         printf("here!!!!!\n");
+        if (clusterNum == 0)
+            clusterNum = 2;
     } else {
         clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
     }
@@ -715,7 +717,9 @@ bpb_t mount_fat32(int img_fd) {
         close(img_fd);
         exit(EXIT_FAILURE);
     }
-    //printf("BPB_BytsPerSec: %u\n", bpb.BPB_BytsPerSec);
+    printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
+    printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
+    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
 
     return bpb;
 }
