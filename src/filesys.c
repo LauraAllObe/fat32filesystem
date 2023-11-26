@@ -113,8 +113,12 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
+            printf("here!!\n");
             if(!is_directory(img_fd, bpb, tokens->items[1]))
+            {
                 new_directory(img_fd, bpb, tokens->items[1]);
+                printf("directory doesn't exist\n");
+            }
             else
                 printf("directory exists\n");
         }
@@ -122,8 +126,12 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("creat command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
         {
+            printf("here!!!\n");
             if(!is_file(img_fd, bpb, tokens->items[1]))
+            {
                 new_file(img_fd, bpb, tokens->items[1]);
+                printf("file doesn't exist\n");
+            }
             else
                 printf("file exists\n");
         }
