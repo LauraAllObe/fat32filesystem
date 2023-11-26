@@ -651,24 +651,42 @@ uint32_t alloca_cluster(int fd) {
     uint32_t min_clus_num = 2;
     uint32_t max_clus_num = 1009;
     uint32_t clus_clus_num = min_clus_num;
-    uint32_t next_clus_num = 0xffffffff;
+    uint32_t next_clus_num;
     
     while (clus_clus_num <= max_clus_num) {
         uint32_t offset = convert_clus_num_to_offset_in_fat_region(clus_clus_num);
-        pread(fd, &next_clus_num, sizeof(uint32_t), offset);
-        printf("Allocating cluster. Current cluster number: %u, Next cluster number: %u\n", 
-           clus_clus_num, next_clus_num);
+        ssize_t bytes_read = pread(fd, &next_clus_num, sizeof(uint32_t), offset);
+
+        // Check if pread was successful
+        if (bytes_read != sizeof(uint32_t)) {
+            perror("Error reading FAT entry");
+            return 0; // Indicate failure
+        }
+
+        printf("Allocating cluster. Current cluster number: %u, FAT entry: %u\n", 
+               clus_clus_num, next_clus_num);
+
+        // Check if the cluster is free
         if (next_clus_num == 0) {
             uint32_t end_of_chain = 0xFFFFFFFF;
-            pwrite(fd, &end_of_chain, sizeof(uint32_t), offset);  // Mark the cluster as used
-            return clus_clus_num;
+            ssize_t bytes_written = pwrite(fd, &end_of_chain, sizeof(uint32_t), offset);
+
+            // Check if pwrite was successful
+            if (bytes_written != sizeof(uint32_t)) {
+                perror("Error writing FAT entry");
+                return 0; // Indicate failure
+            }
+
+            return clus_clus_num; // Return the allocated cluster number
         } else {
             ++clus_clus_num;
         }
     }
+
     printf("No free cluster found\n");
     return 0; // No free cluster found
 }
+
 
 void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr) {
     // Allocate a new cluster
