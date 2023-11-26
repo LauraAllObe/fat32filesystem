@@ -105,8 +105,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         else if(strcmp(tokens->items[0], "cd") == 0 && tokens->size > 2)
             printf("cd command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "cd") == 0)
+        {
             if(!is_valid_path(img_fd,bpb,tokens->items[1]))
                 printf("%s does not exist\n", tokens->items[1]);
+        }
         else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
