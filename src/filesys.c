@@ -214,6 +214,7 @@ void list_content(int img_fd, bpb_t bpb) {
     // Special handling for root directory
     if (strcmp(current_path, "/") == 0) {
         clusterNum = bpb.BPB_RootClus; // The root cluster number is in the BPB
+        printf("here!!!!!\n");
     } else {
         clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
     }
@@ -335,7 +336,6 @@ bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
 
 
 uint32_t directory_location(int fd_img, bpb_t bpb) {
-    printf("4\n");
     uint32_t clusterNum = bpb.BPB_RootClus;
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
@@ -388,7 +388,6 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
     }
 
     free(full_path_copy);
-    printf("5\n");
     return clusterNum;
 }
 
@@ -532,18 +531,26 @@ bool is_8_3_format(const char* name) {
 }
 
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
-    // Convert dir_name to FAT32 8.3 format
-    // Assuming a function that does this conversion
-    printf("1\n");
+    // Check if the directory name is in FAT32 8.3 format
+    if (!is_8_3_format(dir_name)) {
+        printf("Directory name is not in FAT32 8.3 format\n");
+        return;
+    }
+
+    // Convert dir_name to uppercase as FAT32 is case-insensitive
+    char upper_dir_name[12];
+    strncpy(upper_dir_name, dir_name, 11);
+    upper_dir_name[11] = '\0';
+    for (int i = 0; upper_dir_name[i] != '\0'; i++) {
+        upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
+    }
     // Allocate a cluster for the new directory
     uint32_t free_cluster = alloca_cluster(fd_img);
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new directory\n");
         return;
-    } else {
-        printf("Allocated cluster number for new directory: %u\n", free_cluster);
     }
-    printf("2\n");
+
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
     strncpy(new_dir_entry.DIR_Name, dir_name, 11); // Copy dir_name to DIR_Name
@@ -551,13 +558,13 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     new_dir_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
     new_dir_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
     new_dir_entry.DIR_FileSize = 0; // A directory's size is 0
-    printf("3\n");
     // Find the location of the current directory and append the new directory entry
-    uint32_t current_dir_cluster = directory_location(fd_img, bpb);
-    printf("6\n");
-    append_dir_entry(fd_img, &new_dir_entry, current_dir_cluster, bpb);
-
-    printf("end of append new directory entry function.\n");
+    if (strcmp(current_path, "/") == 0) {
+        parent_dir_cluster = bpb.BPB_RootClus; // Use root cluster if in root directory
+    } else {
+        parent_dir_cluster = directory_location(fd_img, bpb); // Else get the parent's cluster
+    }
+    append_dir_entry(fd_img, &new_dir_entry, parent_dir_cluster, bpb);
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
@@ -599,7 +606,6 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     uint32_t bytesProcessed = 0;
-    printf("7\n");
     while (curr_clus_num != 0xFFFFFFFF) {
         uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num);
 
@@ -624,7 +630,6 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
 
             bytesProcessed += sizeof(dentry_t);
         }
-        printf("8\n");
         // Reset for the next cluster
         bytesProcessed = 0;
         uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
@@ -638,7 +643,6 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             curr_clus_num = next_clus_num;
         }
     }
-    printf("9\n");
 }
 
 void dbg_print_dentry(dentry_t *dentry) {
@@ -742,9 +746,6 @@ uint32_t alloca_cluster(int fd) {
             perror("Error reading FAT entry");
             return 0; // Indicate failure
         }
-        if(clus_clus_num < 90)
-            printf("Allocating cluster. Current cluster number: %u, FAT entry: %u\n", 
-                clus_clus_num, next_clus_num);
 
         // Check if the cluster is free
         if (next_clus_num == 0) {
