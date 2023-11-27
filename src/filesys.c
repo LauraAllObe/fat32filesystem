@@ -566,7 +566,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     // Write '.' and '..' entries to the new directory
     write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(free_cluster));
-    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(new_dir_cluster) + sizeof(dentry_t));
+    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(free_cluster) + sizeof(dentry_t));
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
