@@ -552,8 +552,8 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     dentry_t dot_entry = {0};
     strncpy(dot_entry.DIR_Name, ".          ", 11); // 11 characters, padded with spaces
     dot_entry.DIR_Attr = 0x10; // Directory attribute
-    dot_entry.DIR_FstClusHI = (new_dir_cluster >> 16) & 0xFFFF;
-    dot_entry.DIR_FstClusLO = new_dir_cluster & 0xFFFF;
+    dot_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
+    dot_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
 
     dentry_t dotdot_entry = {0};
     strncpy(dotdot_entry.DIR_Name, "..         ", 11); // 11 characters, padded with spaces
@@ -563,8 +563,8 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     dotdot_entry.DIR_FstClusLO = parent_cluster & 0xFFFF;
 
     // Write '.' and '..' entries to the new directory
-    write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(new_dir_cluster));
-    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(new_dir_cluster) + sizeof(dentry_t));
+    write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(free_cluster));
+    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(free_cluster) + sizeof(dentry_t));
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
