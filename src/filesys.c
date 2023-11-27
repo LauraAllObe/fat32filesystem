@@ -355,10 +355,13 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
                     found = false;
                     break;
                 }
-                if (strncmp(dirEntry->DIR_Name, token, 11) == 0 && (dirEntry->DIR_Attr & 0x10)) {
-                    found = true;
-                    clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
-                    break;
+                if (strncmp(dirEntry->DIR_Name, token, strlen(token)) == 0 && (dirEntry->DIR_Attr & 0x10)) {
+                    if (dirEntry->DIR__Name[strlen(token)] == 0x00 or 0x20)
+                    {
+                        found = true;
+                        clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+                        break;
+                    }
                 }
             }
 
