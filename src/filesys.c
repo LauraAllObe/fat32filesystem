@@ -373,6 +373,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
         if (!found) {
             free(full_path_copy);
             printf("nothing found, end of file or bad cluster, ...\n");
+            printf("return of is_end_of_file_or_bad_cluster function:%d\n", clusterNum)
             return 0;
         }
 
