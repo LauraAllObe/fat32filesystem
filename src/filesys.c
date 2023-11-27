@@ -333,6 +333,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
     char *token;
     char *full_path_copy = strdup(current_path);
+    printf("full path copy:%s\n", full_path_copy);
     token = strtok(full_path_copy, "/");
     while (token != NULL) {
         bool found = false;
