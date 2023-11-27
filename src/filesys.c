@@ -118,9 +118,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
-            if(is_directory(img_fd, bpb, tokens->items[1]) == false)
+            if(strcmp(tokens->items[1], ".") == 0 || strcmp(tokens->items[1], "..") == 0)
+                printf("users can not make . or .. directories\n");
+            else if(is_directory(img_fd, bpb, tokens->items[1]) == false)
             {
-                printf("directory does not exist\n");
                 new_directory(img_fd, bpb, tokens->items[1]);
             }
         }
@@ -414,7 +415,6 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
             // End of directory marker
             if (dirEntry->DIR_Name[0] == 0x00) {
-                printf("no directory with the name %s found", upper_dir_name);
                 return false;
             }
 
@@ -422,6 +422,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
             if (dirEntry->DIR_Name[0] != 0xE5 &&
                 strncmp(dirEntry->DIR_Name, upper_dir_name, 11) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
+                    printf("directory already exists\n");
                 return true;
             }
         }
@@ -477,6 +478,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             if (dirEntry->DIR_Name[0] != 0xE5 &&
                 strncmp(dirEntry->DIR_Name, file_name, 11) == 0 && 
                 (dirEntry->DIR_Attr & 0x20)) {
+                    printf("file already exists\n");
                 return true;
             }
         }
@@ -564,7 +566,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     // Write '.' and '..' entries to the new directory
     write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(free_cluster));
-    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(free_cluster) + sizeof(dentry_t));
+    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(new_dir_cluster) + sizeof(dentry_t));
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
