@@ -131,7 +131,6 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         {
             if(is_file(img_fd, bpb, tokens->items[1]) == false)
             {
-                printf("file does not exist\n");
                 new_file(img_fd, bpb, tokens->items[1]);
             }
         }
@@ -686,11 +685,11 @@ void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
 		break;
 	}
 
-	//Check if the entry is a valid file or directory
+	/*//Check if the entry is a valid file or directory
 	if ((dentry.DIR_Attr & 0x10) == 0x10 || (dentry.DIR_Attr & 0x20) == 0x20) {
             dbg_print_dentry(&dentry);
         }
-    }
+    }*/
 }
 
 //mounts the fat23 image file
