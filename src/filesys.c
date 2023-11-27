@@ -339,17 +339,19 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
         bool found = false;
         do {
             // Read the current directory's entries
-            uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+            uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;//BPB_BytsPerSec*BPB_RsvdSecCnt + BPB_NumFATs*BPB_FATSz32*BPB_BytsPerSec
             ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
             if (bytesRead <= 0) {
                 free(full_path_copy);
+                printf("error on read\n");
                 return 0;
             }
 
             for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
                 dirEntry = (dentry_t *)(buffer + i);
                 if (dirEntry->DIR_Name[0] == 0x00) { // End of directory entries
+                    printf("end of directory reached\n");
                     found = false;
                     break;
                 }
@@ -370,6 +372,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
         if (!found) {
             free(full_path_copy);
+            printf("nothing found, end of file or bad cluster, ...\n");
             return 0;
         }
 
