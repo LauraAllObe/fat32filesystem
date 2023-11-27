@@ -688,8 +688,8 @@ void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
 	/*//Check if the entry is a valid file or directory
 	if ((dentry.DIR_Attr & 0x10) == 0x10 || (dentry.DIR_Attr & 0x20) == 0x20) {
             dbg_print_dentry(&dentry);
-        }
-    }*/
+        }*/
+    }
 }
 
 //mounts the fat23 image file
