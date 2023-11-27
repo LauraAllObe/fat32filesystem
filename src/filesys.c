@@ -356,7 +356,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
                     break;
                 }
                 if (strncmp(dirEntry->DIR_Name, token, strlen(token)) == 0 && (dirEntry->DIR_Attr & 0x10)) {
-                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 or 0x20)
+                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 || dirEntry->DIR_Name[strlen(token)] == 0x20)
                     {
                         found = true;
                         clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
