@@ -26,7 +26,7 @@ Implement exit and info commands. A basic Makefile (also from project 1).
 
 ### Part 4: Read [20 points]
 - **Responsibilities**: 
-- **Assigned to**: 
+- **Assigned to**: Jeyma Rodriguez
 
 ### Part 5: Update [10 points]
 - **Responsibilities**: 
