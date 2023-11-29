@@ -714,6 +714,24 @@ bpb_t mount_fat32(int img_fd) {
         close(img_fd);
         exit(EXIT_FAILURE);
     }
+    printf("               INITIAL VALUES:\n");
+    printf("===============================================\n");
+    printf("BS_jmpBoot is %.3s\n", bpb.BS_jmpBoot);
+    printf("BS_OEMName is %.8s\n", bpb.BS_OEMName);
+    printf("BPB_BytsPerSec is %u\n", bpb.BPB_BytsPerSec);
+    printf("BPB_SecPerClus is %u\n", bpb.BPB_SecPerClus);
+    printf("BPB_RsvdSecCnt is %u\n", bpb.BPB_RsvdSecCnt);
+    printf("BPB_NumFATs is %u\n", bpb.BPB_NumFATs);
+    printf("BPB_RootEntCnt is %u\n", bpb.BPB_RootEntCnt);
+    printf("BPB_TotSec16 is %u\n", bpb.BPB_TotSec16);
+    printf("BPB_Media is %u\n", bpb.BPB_Media);
+    printf("BPB_FATSz32 is %u\n", bpb.BPB_FATSz32);
+    printf("BPB_SecPerTrk is %u\n", bpb.BPB_SecPerTrk);
+    printf("BPB_NumHeads is %u\n", bpb.BPB_NumHeads);
+    printf("BPB_HiddSec is %u\n", bpb.BPB_HiddSec);
+    printf("BPB_TotSec32 is %u\n", bpb.BPB_TotSec32);
+    printf("BPB_RootClus is %u\n", bpb.BPB_RootClus);
+    printf("===============================================\n");
 
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
