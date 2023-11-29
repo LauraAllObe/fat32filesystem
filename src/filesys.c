@@ -93,19 +93,38 @@ char current_path[256] = "/";//UPDATE ON cd
 // other data structures and global variables you need
 
 // Find the starting cluster of the file (part 4)
-uint32_t find_starting_cluster(const char* path, int img_fd, bpb_t bpb) {
-    char original_path[256];
-    strncpy(original_path, current_path, sizeof(original_path)); // Store original path
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
+    uint32_t clusterNum = bpb.BPB_RootClus;
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    uint32_t nextClusterNum;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
 
-    strncpy(current_path, path, sizeof(current_path)); // Set path to find the cluster
+    while (!is_end_of_file_or_bad_cluster(clusterNum)) {
+        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+        ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
-    uint32_t clusterNum = directory_location(img_fd, bpb);
+        if (bytesRead <= 0) {
+            return 0;
+        }
 
-    strncpy(current_path, original_path, sizeof(current_path)); // Restore original path
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+            if (dirEntry->DIR_Name[0] == 0x00) {
+                return 0; // File not found
+            }
+            if (strncmp(dirEntry->DIR_Name, filename, 11) == 0) {
+                return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+            }
+        }
 
-    return clusterNum; // Return the starting cluster number
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+        pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
+        clusterNum = nextClusterNum;
+    }
+    return 0; // File not found
 }
-
 
 // Read function implementation (PART 4)
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
@@ -135,9 +154,9 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     snprintf(fullPath, sizeof(fullPath), "%s%s", current_path, filename);
 
     // Calculate the starting cluster of the file
-    uint32_t startCluster = find_starting_cluster(fullPath, img_fd, bpb);
+    uint32_t startCluster = find_file_cluster(img_fd, bpb, filename);
     if (startCluster == 0) {
-        printf("Error: File '%s' not found.\n", filename);
+        printf("File '%s' not found in current directory.\n", filename);
         return;
     }
 
