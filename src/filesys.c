@@ -16,11 +16,14 @@ typedef struct __attribute__((packed)) BPB {
         uint16_t BPB_RootEntCnt;
         uint16_t BPB_TotSec16;
         uint8_t BPB_Media;
-        uint32_t BPB_FATSz32;
+        uint16_t BPB_FATSz16;
         uint16_t BPB_SecPerTrk;
         uint16_t BPB_NumHeads;
         uint32_t BPB_HiddSec;
         uint32_t BPB_TotSec32;
+        uint32_t BPB_FATSz32;
+        uint32_t BPB_ExtFlags;
+        uint32_t BPB_FSVer;
         uint32_t BPB_RootClus;
         char OtherBytes[499];
 } bpb_t;
@@ -711,7 +714,7 @@ bpb_t mount_fat32(int img_fd) {
     bpb.BPB_RootClus = 2;
     bpb.BPB_FATSz32 = 1009;
     printf("BPB_RootClus: %u\n", bpb.BPB_RootClus);
-    printf("BPB_RootClus: %u\n", bpb.BPB_FATSz32);
+    printf("BPB_FATSz32: %u\n", bpb.BPB_FATSz32);
 
     return bpb;
 }
