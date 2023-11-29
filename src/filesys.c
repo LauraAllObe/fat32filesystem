@@ -732,14 +732,9 @@ bpb_t mount_fat32(int img_fd) {
     printf("BPB_TotSec32 is %u\n", bpb.BPB_TotSec32);
     printf("BPB_RootClus is %u\n", bpb.BPB_RootClus);
     printf("===============================================\n");
-
-    printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
-    printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
-    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
     bpb.BPB_RootClus = 2;
-    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
-    printf("Fat size: %u\n", bpb.BPB_FATSz32);
     bpb.BPB_FATSz32 = 1009;
+    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
     printf("Fat size: %u\n", bpb.BPB_FATSz32);
 
     return bpb;
