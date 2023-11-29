@@ -406,7 +406,8 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     bool found = false;
 
     do {
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
+        uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+        dataRegionOffset += (clusterNum - 2) * bufferSize;
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
