@@ -223,7 +223,7 @@ void list_content(int img_fd, bpb_t bpb) {
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
         printf("dataRegionOffset (initial) should be 0x100400, is %u: \n", dataRegionOffset);
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+        dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -341,7 +341,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
             // Read the current directory's entries
             uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
             printf("dataRegionOffset (initial) should be 0x100400, is %u: \n", dataRegionOffset);
-            uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+            dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
             ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
             if (bytesRead <= 0) {
@@ -469,7 +469,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
         printf("dataRegionOffset (initial) should be 0x100400, is %u: \n", dataRegionOffset);
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
+        dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -735,14 +735,14 @@ bpb_t mount_fat32(int img_fd) {
 uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset, bpb_t bpb) {
     uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
     printf("fat_region_offset should be 0x4000, is %u: \n", fat_region_offset);
-    uint32_t fat_region_offset = 0x4000;
+    fat_region_offset = 0x4000;
     return (offset - fat_region_offset)/4;
 }
 
 uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb) {
     uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
     printf("fat_region_offset should be 0x4000, is %u: \n", fat_region_offset);
-    uint32_t fat_region_offset = 0x4000;
+    fat_region_offset = 0x4000;
     return fat_region_offset + clus_num * 4;
 }
 
@@ -750,7 +750,7 @@ uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb)
     uint32_t data_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
     printf("data_region_offset should be 0x100400, is %u: \n", data_region_offset);
     uint32_t clus_size = 512;
-    uint32_t data_region_offset = 0x100400;
+    data_region_offset = 0x100400;
     return data_region_offset + (clus_num - 2) * clus_size;
 }
 
@@ -817,7 +817,7 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
         pwrite(fd, &new_clus_num, sizeof(uint32_t), final_offset);
 
         // Mark the new cluster as the end of the chain
-        uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num);
+        uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num, bpb);
         uint32_t end_of_file = 0xFFFFFFFF;
         pwrite(fd, &end_of_file, sizeof(uint32_t), new_offset);
     }
