@@ -450,7 +450,10 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             if (dirEntry->DIR_Name[0] == 0x00) {
                 return false;
             }
-
+            printf("dirEntry->DIR_Name[0] is 0x%X\n", dirEntry->DIR_Name[0]);
+            printf("dirEntry->DIR_Name is %s\n", dirEntry->DIR_Name);
+            printf("dirEntry->DIR_Attr is 0x%X\n", dirEntry->DIR_Attr);
+            printf("dirEntry->DIR_Name[strlen(file_name)] is 0x%X\n", dirEntry->DIR_Name[strlen(file_name)]);
             // Skip deleted entries and check for file name match
             if (dirEntry->DIR_Name[0] != 0xE5 &&
                 strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
