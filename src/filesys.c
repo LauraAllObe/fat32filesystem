@@ -46,7 +46,6 @@ tokenlist * get_tokens(char *input);
 tokenlist * new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
-void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb);
 void print_boot_sector_info(bpb_t bpb);
 void dbg_print_dentry(dentry_t *dentry);
 bpb_t mount_fat32(int img_fd);
@@ -163,24 +162,6 @@ int main(int argc, char const *argv[])
     uint32_t next_clus_num = 0;
     uint32_t max_clus_num = bpb.BPB_FATSz32 / bpb.BPB_SecPerClus;
     uint32_t min_clus_num = 2;
-
-    while (curr_clus_num >= min_clus_num && curr_clus_num <= max_clus_num) {
-        // if the cluster number is not in the range, this cluster is:
-        // 1. reserved cluster
-        // 2. end of the file
-        // 3. bad cluster.
-        // No matter which kind of number, we can consider it is the end of a file.
-        if (is_end_of_file_or_bad_cluster(curr_clus_num)) {
-            printf("This cluster is the end of a file or a bad cluster: %u\n", curr_clus_num);
-            break; // Exit the loop if it's the end of a file or a bad cluster.
-        }
-
-	process_directory_entries(img_fd, curr_clus_num, bpb);
-
-        offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num, bpb);
-        pread(img_fd, &next_clus_num, sizeof(uint32_t), offset);
-        curr_clus_num = next_clus_num;
-    }
 
     // 3. main procees
     main_process(img_fd, img_path, bpb);
@@ -665,30 +646,6 @@ void print_boot_sector_info(bpb_t bpb) {
     printf("Size of Image (in bytes): %u\n", imageSize);
 }
 
-// Revised function to read and process directory entries
-void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
-    uint32_t sectorSize = bpb.BPB_BytsPerSec;
-    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
-    uint32_t dataRegionOffset = ((cluster_num - 2) * clusterSize) +
-                                (bpb.BPB_NumFATs * bpb.BPB_FATSz32 * sectorSize) +
-                                (bpb.BPB_RsvdSecCnt * sectorSize);
-
-    for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
-        dentry_t dentry;
-        ssize_t rd_bytes = pread(fat32_fd, &dentry, sizeof(dentry_t), dataRegionOffset + i);
-
-        if (rd_bytes != sizeof(dentry_t)) {
-		//Handle error
-		break;
-	}
-
-	/*//Check if the entry is a valid file or directory
-	if ((dentry.DIR_Attr & 0x10) == 0x10 || (dentry.DIR_Attr & 0x20) == 0x20) {
-            dbg_print_dentry(&dentry);
-        }*/
-    }
-}
-
 //mounts the fat23 image file
 bpb_t mount_fat32(int img_fd) {
     bpb_t bpb;
@@ -724,8 +681,8 @@ bpb_t mount_fat32(int img_fd) {
     printf("===============================================\n");
     bpb.BPB_RootClus = 2;
     bpb.BPB_FATSz32 = 1009;
-    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
-    printf("Fat size: %u\n", bpb.BPB_FATSz32);
+    printf("BPB_RootClus: %u\n", bpb.BPB_RootClus);
+    printf("BPB_FATSz32: %u\n", bpb.BPB_FATSz32);
 
     return bpb;
 }
