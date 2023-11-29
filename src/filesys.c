@@ -29,11 +29,9 @@ typedef struct __attribute__((packed)) BPB {
 typedef struct __attribute__((packed)) directory_entry {
     char DIR_Name[11];
     uint8_t DIR_Attr;
-    char padding_1[8]; // DIR_NTRes, DIR_CrtTimeTenth, DIR_CrtTime, DIR_CrtDate, 
-                       // DIR_LstAccDate. Since these fields are not used in
-                       // Project 3, just define as a placeholder.
+    char padding_1[8];
     uint16_t DIR_FstClusHI;
-    char padding_2[4]; // DIR_WrtTime, DIR_WrtDate
+    char padding_2[4];
     uint16_t DIR_FstClusLO;
     uint32_t DIR_FileSize;
 } dentry_t;
@@ -714,6 +712,15 @@ bpb_t mount_fat32(int img_fd) {
         printf("request %zu bytes, but read %zu bytes\n", sizeof(bpb_t), rd_bytes);
         close(img_fd);
         exit(EXIT_FAILURE);
+    }
+
+    if (bpb.BPB_RootClus == 0) {
+        // Calculate the first data sector
+        uint32_t firstDataSector = bpb.BPB_RsvdSecCnt + (bpb.BPB_NumFATs * bpb.BPB_FATSz32);
+        uint32_t firstDataCluster = firstDataSector / bpb.BPB_SecPerClus;
+
+        // Set the calculated root cluster number
+        bpb.BPB_RootClus = firstDataCluster;
     }
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
