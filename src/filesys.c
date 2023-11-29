@@ -7,25 +7,27 @@
 #include <stdbool.h>
 
 typedef struct __attribute__((packed)) BPB {
-        char BS_jmpBoot[3];
-        char BS_OEMName[8];
-        uint16_t BPB_BytsPerSec;
-        uint8_t BPB_SecPerClus;
-        uint16_t BPB_RsvdSecCnt;
-        uint8_t BPB_NumFATs;
-        uint16_t BPB_RootEntCnt;
-        uint16_t BPB_TotSec16;
-        uint8_t BPB_Media;
-        uint16_t BPB_FATSz16;
-        uint16_t BPB_SecPerTrk;
-        uint16_t BPB_NumHeads;
-        uint32_t BPB_HiddSec;
-        uint32_t BPB_TotSec32;
-        uint32_t BPB_FATSz32;
-        uint32_t BPB_ExtFlags;
-        uint32_t BPB_FSVer;
-        uint32_t BPB_RootClus;
-        char OtherBytes[499];
+    char BS_jmpBoot[3];
+    char BS_OEMName[8];
+    uint16_t BPB_BytsPerSec;
+    uint8_t BPB_SecPerClus;
+    uint16_t BPB_RsvdSecCnt;
+    uint8_t BPB_NumFATs;
+    uint16_t BPB_RootEntCnt;
+    uint16_t BPB_TotSec16;
+    uint8_t BPB_Media;
+    uint16_t BPB_FATSz16;
+    uint16_t BPB_SecPerTrk;
+    uint16_t BPB_NumHeads;
+    uint32_t BPB_HiddSec;
+    uint32_t BPB_TotSec32;
+    uint32_t BPB_FATSz32;
+    uint16_t BPB_ExtFlags;
+    uint16_t BPB_FSVer;
+    uint32_t BPB_RootClus;
+    uint16_t BPB_FSInfo;
+    uint16_t BPB_BkBootSec;
+    char BPB_Reserved[12];
 } bpb_t;
 
 
