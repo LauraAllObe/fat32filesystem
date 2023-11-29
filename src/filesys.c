@@ -16,7 +16,6 @@ typedef struct __attribute__((packed)) BPB {
         uint16_t BPB_RootEntCnt;
         uint16_t BPB_TotSec16;
         uint8_t BPB_Media;
-        uint16_t BPB_FATSz16;
         uint32_t BPB_FATSz32;
         uint16_t BPB_SecPerTrk;
         uint16_t BPB_NumHeads;
@@ -161,9 +160,7 @@ int main(int argc, char const *argv[])
     uint32_t offset = 0;
     uint32_t curr_clus_num = 3;
     uint32_t next_clus_num = 0;
-    uint32_t BPB_SecPerClus = 1;
-    uint32_t BPB_FATSz32 = 1009;
-    uint32_t max_clus_num = BPB_FATSz32 / BPB_SecPerClus;
+    uint32_t max_clus_num = bpb.BPB_FATSz32 / bpb.BPB_SecPerClus;
     uint32_t min_clus_num = 2;
 
     while (curr_clus_num >= min_clus_num && curr_clus_num <= max_clus_num) {
@@ -222,12 +219,7 @@ void list_content(int img_fd, bpb_t bpb) {
 
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
-        printf("dataRegionOffset (initial) should be 0x100400, is 0x%X\n", dataRegionOffset);
-        printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-        printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-        printf("bpb.BPB_NumFATs is %u should be 2\n", bpb.BPB_NumFATs);
-        printf("bpb.BPB_FATSz32 is %u should be 1009\n", bpb.BPB_FATSz32);
-        dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+        dataRegionOffset += (clusterNum - 2) * clusterSize;
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -344,12 +336,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
         do {
             // Read the current directory's entries
             uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
-            printf("dataRegionOffset (initial) should be 0x100400, is 0x%X\n", dataRegionOffset);
-            printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-            printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-            printf("bpb.BPB_NumFATs is %u should be 2\n", bpb.BPB_NumFATs);
-            printf("bpb.BPB_FATSz32 is %u should be 1009\n", bpb.BPB_FATSz32);
-            dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+            dataRegionOffset += (clusterNum - 2) * clusterSize;
             ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
             if (bytesRead <= 0) {
@@ -476,12 +463,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
 
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
-        printf("dataRegionOffset (initial) should be 0x100400, is 0x%X\n", dataRegionOffset);
-        printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-        printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-        printf("bpb.BPB_NumFATs is %u should be 2\n", bpb.BPB_NumFATs);
-        printf("bpb.BPB_FATSz32 is %u should be 1009\n", bpb.BPB_FATSz32);
-        dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
+        dataRegionOffset += (clusterNum - 2) * bufferSize;
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -746,37 +728,22 @@ bpb_t mount_fat32(int img_fd) {
 
 uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset, bpb_t bpb) {
     uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
-    printf("fat_region_offset should be 0x4000, is 0x%X\n", fat_region_offset);
-    printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-    printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-    fat_region_offset = 0x4000;
     return (offset - fat_region_offset)/4;
 }
 
 uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb) {
     uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
-    printf("fat_region_offset should be 0x4000, is 0x%X\n", fat_region_offset);
-    printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-    printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-    fat_region_offset = 0x4000;
     return fat_region_offset + clus_num * 4;
 }
 
 uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb) {
     uint32_t data_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
-    printf("data_region_offset should be 0x100400, is 0x%X\n", data_region_offset);
-    printf("bpb.BPB_BytsPerSec is %u should be 512\n", bpb.BPB_BytsPerSec);
-    printf("bpb.BPB_RsvdSecCnt is %u should be 32\n", bpb.BPB_RsvdSecCnt);
-    printf("bpb.BPB_NumFATs is %u should be 2\n", bpb.BPB_NumFATs);
-    printf("bpb.BPB_FATSz32 is %u should be 1009\n", bpb.BPB_FATSz32);
-    uint32_t clus_size = 512;
-    data_region_offset = 0x100400;
-    return data_region_offset + (clus_num - 2) * clus_size;
+    return data_region_offset + (clus_num - 2) * bpb.BPB_BytsPerSec;
 }
 
 uint32_t alloca_cluster(int fd, bpb_t bpb) {
     uint32_t min_clus_num = 2;
-    uint32_t max_clus_num = 1009;
+    uint32_t max_clus_num = bpb.BPB_FATSz32;
     uint32_t clus_clus_num = min_clus_num;
     uint32_t next_clus_num;
     
