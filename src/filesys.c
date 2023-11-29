@@ -692,31 +692,6 @@ bpb_t mount_fat32(int img_fd) {
     printf("BPB_TotSec32 is %u\n", bpb.BPB_TotSec32);
     printf("BPB_RootClus is %u\n", bpb.BPB_RootClus);
     printf("===============================================\n");
-    /*OUTPUT
-                    INITIAL VALUES:
-    ===============================================
-    BS_jmpBoot is X
-    S_OEMName is mkfs.fat
-    BPB_BytsPerSec is 512
-    BPB_SecPerClus is 1
-    BPB_RsvdSecCnt is 32
-    BPB_NumFATs is 2
-    BPB_RootEntCnt is 0
-    BPB_TotSec16 is 0
-    BPB_Media is 248
-    BPB_FATSz32 is 2097152
-    BPB_SecPerTrk is 64
-    BPB_NumHeads is 0
-    BPB_HiddSec is 0
-    BPB_TotSec32 is 66125826
-    BPB_RootClus is 0
-    ===============================================
-
-    */
-    bpb.BPB_RootClus = 2;
-    bpb.BPB_FATSz32 = 1009;
-    printf("BPB_RootClus: %u\n", bpb.BPB_RootClus);
-    printf("BPB_FATSz32: %u\n", bpb.BPB_FATSz32);
 
     return bpb;
 }
