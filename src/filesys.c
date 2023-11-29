@@ -186,8 +186,6 @@ void list_content(int img_fd, bpb_t bpb) {
     // Special handling for root directory
     if (strcmp(current_path, "/") == 0) {
         clusterNum = bpb.BPB_RootClus; // The root cluster number is in the BPB
-        if (clusterNum == 0)
-            clusterNum = 2;
     } else {
         clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
     }
@@ -214,7 +212,7 @@ void list_content(int img_fd, bpb_t bpb) {
             printf("Error reading directory entries.\n");
             return;
         }
-
+        bool entriesPresentInCluster = false;
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
 
@@ -228,7 +226,7 @@ void list_content(int img_fd, bpb_t bpb) {
             if (dirEntry->DIR_Name[0] == 0xE5) {
                 continue;
             }
-
+            entriesPresentInCluster = true;
             // Print directory entry name
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
@@ -245,6 +243,11 @@ void list_content(int img_fd, bpb_t bpb) {
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
         pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
+
+        if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
+            endOfDirectoryReached = endOfDirectoryReached || !entriesPresentInCluster;
+        }
+
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum) && !endOfDirectoryReached);
