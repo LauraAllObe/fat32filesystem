@@ -63,6 +63,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb);
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name);
 bool is_file(int fd_img, bpb_t bpb, const char* file_name);
 bool is_8_3_format(const char* name);
+bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
@@ -385,14 +386,8 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 }
 
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
-    char upper_dir_name[12];
-    strncpy(upper_dir_name, dir_name, 11);
-    upper_dir_name[11] = '\0'; // Ensure null termination
-    for (int i = 0; upper_dir_name[i] != '\0'; i++) {
-        upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
-    }
 
-    if (!is_8_3_format(upper_dir_name)) {
+    if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
         printf("%s is not in fat32 8.3 format", dir_name);
         return true; // Return true if not in 8.3 format
     }
@@ -425,7 +420,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
             // Skip deleted entries and check for directory name match
             if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, upper_dir_name, 11) == 0 && 
+                strncmp(dirEntry->DIR_Name, dir_name, 11) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
                     printf("directory already exists\n");
                 return true;
@@ -437,19 +432,13 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-    printf("no directory with the name %s found", upper_dir_name);
+    printf("no directory with the name %s found", dir_name);
     return false;
 }
 
 bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
-    char upper_file_name[12];
-    strncpy(upper_file_name, file_name, 11);
-    upper_file_name[11] = '\0'; // Ensure null termination
-    for (int i = 0; upper_file_name[i] != '\0'; i++) {
-        upper_file_name[i] = toupper((unsigned char)upper_file_name[i]);
-    }
 
-    if (!is_8_3_format(upper_file_name)) {
+    if (!is_8_3_format(file_name)) {
         printf("%s is not in fat32 8.3 format", file_name);
         return true; // Return true if not in 8.3 format
     }
@@ -509,28 +498,29 @@ bool is_8_3_format(const char* name) {
             name_len = 0; // Reset length for extension part
         } else {
             name_len++;
-            if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8)) {
-                printf("not in 8.3 format\n");
+            if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8))
                 return false; // Extension or name part too long
-            }
         }
+    }
+    return true;
+}
+
+bool is_8_3_format_directory(const char* name) {
+    for (int i = 0; name[i] != '\0'; i++) {
+        char upper_char = toupper((unsigned char)name[i]);
+
+        // Check if the character is not the same as its uppercase version
+        if (name[i] != upper_char)
+            return false;
     }
     return true;
 }
 
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Check if the directory name is in FAT32 8.3 format
-    if (!is_8_3_format(dir_name)) {
+    if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
         printf("Directory name is not in FAT32 8.3 format\n");
         return;
-    }
-
-    // Convert dir_name to uppercase as FAT32 is case-insensitive
-    char upper_dir_name[12];
-    strncpy(upper_dir_name, dir_name, 11);
-    upper_dir_name[11] = '\0';
-    for (int i = 0; upper_dir_name[i] != '\0'; i++) {
-        upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
     }
 
     // Allocate a cluster for the new directory
@@ -542,7 +532,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
-    strncpy(new_dir_entry.DIR_Name, upper_dir_name, 11);
+    strncpy(new_dir_entry.DIR_Name, dir_name, 11);
     new_dir_entry.DIR_Attr = 0x10; // Directory attribute
     new_dir_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
     new_dir_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
@@ -708,7 +698,7 @@ bpb_t mount_fat32(int img_fd) {
         close(img_fd);
         exit(EXIT_FAILURE);
     }
-    // check if rd_bytes == sizeof(BPB_BytsPerSec)
+
     if (rd_bytes != sizeof(bpb_t)) {
         printf("request %zu bytes, but read %zu bytes\n", sizeof(bpb_t), rd_bytes);
         close(img_fd);
