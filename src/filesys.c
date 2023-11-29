@@ -93,30 +93,17 @@ char current_path[256] = "/";//UPDATE ON cd
 // other data structures and global variables you need
 
 // Find the starting cluster of the file (part 4)
-uint32_t find_starting_cluster(const char* filename, int img_fd, bpb_t bpb) {
-    uint32_t currentCluster = (strcmp(current_path, "/") == 0) ? bpb.BPB_RootClus : /* get the first cluster of the current directory */;
-    uint32_t sectorSize = bpb.BPB_BytsPerSec;
-    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
-    char buffer[clusterSize];
-    dentry_t *dirEntry;
+uint32_t find_starting_cluster(const char* path, int img_fd, bpb_t bpb) {
+    char original_path[256];
+    strncpy(original_path, current_path, sizeof(original_path)); // Store original path
 
-    while (!is_end_of_file_or_bad_cluster(currentCluster)) {
-        uint32_t dataRegionOffset = /* calculate offset based on currentCluster */;
-        pread(img_fd, buffer, clusterSize, dataRegionOffset);
+    strncpy(current_path, path, sizeof(current_path)); // Set path to find the cluster
 
-        for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
-            dirEntry = (dentry_t *)(buffer + i);
-            if (dirEntry->DIR_Name[0] == 0x00) { // End of directory entries
-                return 0; // File not found
-            }
-            if (strncmp(dirEntry->DIR_Name, filename, 11) == 0) { // Check for filename match
-                return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | dirEntry->DIR_FstClusLO; // Return the starting cluster
-            }
-        }
-        // Move to the next cluster
-        currentCluster = getNextClusterFromFAT(currentCluster, img_fd, bpb);
-    }
-    return 0; // File not found
+    uint32_t clusterNum = directory_location(img_fd, bpb);
+
+    strncpy(current_path, original_path, sizeof(current_path)); // Restore original path
+
+    return clusterNum; // Return the starting cluster number
 }
 
 
@@ -143,15 +130,23 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
         return;
     }
 
+    // Calculate the full path of the file
+    char fullPath[512]; // Adjust size as needed
+    snprintf(fullPath, sizeof(fullPath), "%s%s", current_path, filename);
+
+    // Calculate the starting cluster of the file
+    uint32_t startCluster = find_starting_cluster(fullPath, img_fd, bpb);
+    if (startCluster == 0) {
+        printf("Error: File '%s' not found.\n", filename);
+        return;
+    }
+
     // Buffer to store read data
     char *buffer = malloc(size);
     if (buffer == NULL) {
         printf("Error: Memory allocation failed.\n");
         return;
     }
-
-    // Calculate the starting cluster of the file (not implemented yet)
-    uint32_t startCluster = find_starting_cluster(filename, img_fd, bpb); // calling find_starting_cluster function
 
     // Calculate which cluster the logical offset corresponds to
     uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
@@ -162,16 +157,18 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     // Follow the cluster chain to find the correct cluster
     uint32_t currentCluster = startCluster;
     for (uint32_t i = 0; i < clusterOffset; ++i) {
-        currentCluster = getNextClusterFromFAT(currentCluster);
-        // Add checks for end-of-file or bad cluster
+        currentCluster = getNextClusterFromFAT(currentCluster, img_fd, bpb);
+        if (is_end_of_file_or_bad_cluster(currentCluster)) {
+            printf("Error: Reached end of file or encountered a bad cluster.\n");
+            free(buffer);
+            return;
+        }
     }
 
     // Calculate the actual offset in the FAT32 image
-    // This involves FAT32 file system specifics
     uint32_t firstDataSector = bpb.BPB_RsvdSecCnt + (bpb.BPB_NumFATs * bpb.BPB_FATSz32);
     uint32_t dataRegionOffset = firstDataSector * bpb.BPB_BytsPerSec;
     uint32_t actual_offset = ((currentCluster - 2) * clusterSize) + dataRegionOffset + intraClusterOffset;
-
 
     // Read data from the file using pread
     ssize_t bytes_read = pread(img_fd, buffer, size, actual_offset);
@@ -182,8 +179,7 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     }
 
     // Process and output the read data
-    // For example, print the buffer contents
-    // fwrite(buffer, 1, bytes_read, stdout);
+    fwrite(buffer, 1, bytes_read, stdout);
     
     // Update the file offset in openFiles array
     openFiles[fileIndex].offset += bytes_read;
