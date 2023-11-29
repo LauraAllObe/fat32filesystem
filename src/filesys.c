@@ -388,7 +388,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
-        printf("%s is not in fat32 8.3 format", dir_name);
+        printf("%s is not in fat32 8.3 format\n", dir_name);
         return true; // Return true if not in 8.3 format
     }
 
@@ -439,7 +439,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
 
     if (!is_8_3_format(file_name)) {
-        printf("%s is not in fat32 8.3 format", file_name);
+        printf("%s is not in fat32 8.3 format\n", file_name);
         return true; // Return true if not in 8.3 format
     }
 
