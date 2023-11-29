@@ -398,13 +398,14 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
             if (dirEntry->DIR_Name[0] == 0x00) {
                 return false;
             }
-
             // Skip deleted entries and check for directory name match
-            if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, dir_name, 11) == 0 && 
+            if (dirEntry->DIR_Name[0] != 0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
-                    printf("directory already exists\n");
-                return true;
+                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 || dirEntry->DIR_Name[strlen(token)] == 0x20)
+                    {
+                        printf("directory already exists\n");
+                        return true;
+                    }
             }
         }
         // Get next cluster number from FAT
@@ -452,10 +453,13 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
 
             // Skip deleted entries and check for file name match
             if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, file_name, 11) == 0 && 
+                strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x20)) {
-                    printf("file already exists\n");
-                return true;
+                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 || dirEntry->DIR_Name[strlen(token)] == 0x20)
+                    {
+                        printf("file already exists\n");
+                        return true;
+                    }
             }
         }
 
