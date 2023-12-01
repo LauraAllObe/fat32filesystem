@@ -69,6 +69,8 @@ bool is_8_3_format(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename);
+void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
