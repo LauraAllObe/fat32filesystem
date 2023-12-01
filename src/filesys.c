@@ -72,6 +72,7 @@ bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
+void remove_file(int imd_fd, bpb_t bpb, const char* file_name);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
@@ -153,11 +154,18 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         {
             if(tokens->size == 3)
             {
-
+                //recursively remove directory and its contents
             }
             else
             {
-
+                if(is_file(imd_fd, bpb, tokens->items[1]) == false)
+                {
+                    remove_file(imd_fid, bpb, tokens->items[1]);
+                }
+                else
+                {
+                    printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
+                }
             }
         }
         // else if cmd is ...
@@ -201,6 +209,83 @@ int main(int argc, char const *argv[])
     close(img_fd);
 
     return 0;
+}
+
+void remove_file(int imd_fd, bpb_t bpb, const char* file_name) {
+    if (!is_8_3_format(file_name)) {
+        printf("%s is not in FAT32 8.3 format\n", file_name);
+        return;
+    }
+
+    uint32_t dir_cluster = directory_location(img_fd, bpb);
+    if (dir_cluster == 0) {
+        printf("Error: Directory not found.\n");
+        return;
+    }
+
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
+    bool fileFound = false;
+    uint32_t fileFirstCluster;
+
+    while (dir_cluster != 0xFFFFFFFF) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+
+        if (bytesRead <= 0) {
+            printf("Error reading directory entries.\n");
+            return;
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+
+            if (dirEntry->DIR_Name[0] == 0x00) break; // End of directory entries
+
+            if (dirEntry->DIR_Name[0] == 0xE5) continue; // Skip deleted entries
+
+
+            if (strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 
+            && (dirEntry->DIR_Name[strlen(file_name)] == 0x00 || dirEntry->DIR_Name[strlen(file_name)] == 0x20)) {
+                // Check if entry is a file
+                if (!(dirEntry->DIR_Attr & 0x10)) {
+                    fileFound = true;
+                    fileFirstCluster = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+
+                    // Mark as deleted
+                    dirEntry->DIR_Name[0] = 0xE5;
+                    pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i);
+                    break;
+                }
+            }
+        }
+
+        if (fileFound) break;
+
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+        pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+    }
+
+    if (!fileFound) {
+        printf("File not found.\n");
+        return;
+    }
+
+    // Free the clusters used by the file
+    uint32_t currentCluster = fileFirstCluster;
+    while (!is_end_of_file_or_bad_cluster(currentCluster)) {
+        uint32_t nextCluster;
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
+        pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset);
+
+        uint32_t freeCluster = 0;
+        pwrite(img_fd, &freeCluster, sizeof(uint32_t), fatOffset);
+
+        currentCluster = nextCluster;
+    }
 }
 
 void list_content(int img_fd, bpb_t bpb) {
