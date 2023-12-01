@@ -96,45 +96,68 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
 
         // 2. if cmd is "exit" break;
         if(strcmp(tokens->items[0], "exit") == 0 && tokens->size > 1)
-            printf("exit command does not take any arguments\n");
+            printf("exit command does not take any arguments.\n");
         else if(strcmp(tokens->items[0], "exit") == 0)
         {
             free_tokens(tokens);
             break;
         }
         else if(strcmp(tokens->items[0], "info") == 0 && tokens->size > 1)
-            printf("info command does not take any arguments\n");
+            printf("info command does not take any arguments.\n");
         else if (strcmp(tokens->items[0], "info") == 0)
             print_boot_sector_info(bpb);
         else if(strcmp(tokens->items[0], "cd") == 0 && tokens->size > 2)
-            printf("cd command does not take more than two arguments\n");
+            printf("cd command does not take more than two arguments.\n");
+        else if(strcmp(tokens->items[0], "cd") == 0 && tokens->size < 2)
+            printf("cd command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "cd") == 0)
         {
             if(!is_valid_path(img_fd,bpb,tokens->items[1]))
-                printf("%s does not exist\n", tokens->items[1]);
+                printf("%s does not exist.\n", tokens->items[1]);
         }
         else if(strcmp(tokens->items[0], "ls") == 0 && tokens->size > 1)
-            printf("ls command does not take any arguments\n");
+            printf("ls command does not take any arguments.\n");
         else if (strcmp(tokens->items[0], "ls") == 0)
             list_content(img_fd, bpb);
         else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size > 2)
-            printf("mkdir command does not take more than two arguments\n");
+            printf("mkdir command does not take more than two arguments.\n");
+        else if(strcmp(tokens->items[0], "mkdir") == 0 && tokens->size < 2)
+            printf("mkdir command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
             if(strcmp(tokens->items[1], ".") == 0 || strcmp(tokens->items[1], "..") == 0)
-                printf("users can not make . or .. directories\n");
+                printf("users can not make . or .. directories.\n");
             else if(is_directory(img_fd, bpb, tokens->items[1]) == false)
             {
                 new_directory(img_fd, bpb, tokens->items[1]);
             }
         }
         else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size > 2)
-            printf("creat command does not take more than two arguments\n");
+            printf("creat command does not take more than two arguments.\n");
+        else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size < 2)
+            printf("creat command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
         {
             if(is_file(img_fd, bpb, tokens->items[1]) == false)
             {
                 new_file(img_fd, bpb, tokens->items[1]);
+            }
+        }
+        else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size > 3)
+            printf("rm command does not take more than three arguments\n");
+        else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size < 2)
+            printf("rm command requires an argument, none was given.\n");
+        else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size == 3 && strcmp(tokens->items[1], "-r") != 0)
+            printf("unknown flag for rm command, did you mean %s -r %s?\n", tokens->items[0], tokens->items[2]);
+        else if (strcmp(tokens->items[0], "rm") == 0)
+        {
+            if(tokens->size == 3)
+            {
+
+            }
+            else
+            {
+
             }
         }
         // else if cmd is ...
