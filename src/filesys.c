@@ -320,10 +320,9 @@ void list_content(int img_fd, bpb_t bpb) {
             printf("Error reading directory entries.\n");
             return;
         }
-        bool entriesPresentInCluster = false;
+
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
-            //printf("%s is 0x%X\n", dirEntry->DIR_Name, dirEntry->DIR_Name[0]);
 
             // End of directory entries marker
             if (dirEntry->DIR_Name[0] == 0x00) {
@@ -333,9 +332,9 @@ void list_content(int img_fd, bpb_t bpb) {
 
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == 0xE5) {
-                continue;
+                continue; // Correctly skip the deleted file
             }
-            entriesPresentInCluster = true;
+
             // Print directory entry name
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
@@ -354,7 +353,7 @@ void list_content(int img_fd, bpb_t bpb) {
         pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
 
         if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
-            endOfDirectoryReached = endOfDirectoryReached || !entriesPresentInCluster;
+            endOfDirectoryReached = endOfDirectoryReached || (bytesRead < clusterSize);
         }
 
         clusterNum = nextClusterNum;
