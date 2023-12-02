@@ -773,6 +773,14 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
         return;
     }
 
+    // Mark the allocated cluster as the end of the cluster chain in the FAT
+    uint32_t end_of_chain = 0x0FFFFFFF; // End-of-chain marker for FAT32
+    uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(free_cluster, bpb);
+    if (pwrite(fd_img, &end_of_chain, sizeof(uint32_t), fat_offset) != sizeof(uint32_t)) {
+        perror("Error marking end of cluster chain");
+        return;
+    }
+
     // Create a directory entry for the new file
     dentry_t new_file_entry = {0};
     strncpy(new_file_entry.DIR_Name, file_name, 11); // Copy file_name to DIR_Name
