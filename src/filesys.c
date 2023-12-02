@@ -822,14 +822,15 @@ void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
 
 void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb) {
     uint32_t curr_clus_num = clus_num;
-    uint32_t next_clus_num = 0;
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     uint32_t bytesProcessed = 0;
-    while (curr_clus_num != 0xFFFFFFFF) {
+    bool spaceFound = false;
+
+    while (true) {
         uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num, bpb);
 
-        while (bytesProcessed < clusterSize) {
+        for (bytesProcessed = 0; bytesProcessed < clusterSize; bytesProcessed += sizeof(dentry_t)) {
             dentry_t dentry;
             ssize_t rd_bytes = pread(fd, &dentry, sizeof(dentry_t), data_offset + bytesProcessed);
             if (rd_bytes != sizeof(dentry_t)) {
@@ -841,27 +842,32 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
-                    return;  // Add return here to exit the function if write fails
+                    return;
                 }
-                return;
+                return; // Entry written, exit function
             }
-
-            bytesProcessed += sizeof(dentry_t);
         }
-        // Reset for the next cluster
-        bytesProcessed = 0;
+
+        // Check if next cluster is available in the chain
         uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num, bpb);
+        uint32_t next_clus_num;
         pread(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
 
         if (next_clus_num == 0xFFFFFFFF) {
-            next_clus_num = alloca_cluster(fd, bpb);
-            pwrite(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
-            curr_clus_num = next_clus_num;
+            // Allocate a new cluster and link it
+            uint32_t new_clus_num = alloca_cluster(fd, bpb);
+            if (new_clus_num == 0) {
+                printf("No free cluster available for directory expansion\n");
+                return;
+            }
+            pwrite(fd, &new_clus_num, sizeof(uint32_t), fat_offset); // Link the new cluster
+            curr_clus_num = new_clus_num;
         } else {
-            curr_clus_num = next_clus_num;
+            curr_clus_num = next_clus_num; // Move to next cluster in the chain
         }
     }
 }
+
 
 void dbg_print_dentry(dentry_t *dentry) {
     if (dentry == NULL) {
