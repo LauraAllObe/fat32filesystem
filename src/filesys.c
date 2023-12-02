@@ -432,7 +432,7 @@ void list_content(int img_fd, bpb_t bpb) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory entries marker
-            if (dirEntry->DIR_Name[0] == 0x00) {
+            if (dirEntry->DIR_Name[0] == (char)0x00) {
                 endOfDirectoryReached = true;
                 break;
             }
@@ -556,13 +556,13 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
             for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
                 dirEntry = (dentry_t *)(buffer + i);
-                if (dirEntry->DIR_Name[0] == 0x00) { // End of directory entries
+                if (dirEntry->DIR_Name[0] == (char)0x00) { // End of directory entries
                     printf("end of directory reached\n");
                     found = false;
                     break;
                 }
                 if (strncmp(dirEntry->DIR_Name, token, strlen(token)) == 0 && (dirEntry->DIR_Attr & 0x10)) {
-                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 || dirEntry->DIR_Name[strlen(token)] == 0x20)
+                    if (dirEntry->DIR_Name[strlen(token)] == (char)0x00 || dirEntry->DIR_Name[strlen(token)] == (char)0x20)
                     {
                         found = true;
                         clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
@@ -622,13 +622,13 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
-            if (dirEntry->DIR_Name[0] == 0x00) {
+            if (dirEntry->DIR_Name[0] == (char)0x00) {
                 return false;
             }
             // Skip deleted entries and check for directory name match
             if (dirEntry->DIR_Name[0] != (char)0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
-                    if (dirEntry->DIR_Name[strlen(dir_name)] == 0x00 || dirEntry->DIR_Name[strlen(dir_name)] == 0x20)
+                    if (dirEntry->DIR_Name[strlen(dir_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(dir_name)] == (char)0x20)
                     {
                         printf("directory already exists\n");
                         return true;
@@ -674,7 +674,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
-            if (dirEntry->DIR_Name[0] == 0x00) {
+            if (dirEntry->DIR_Name[0] == (char)0x00) {
                 return false;
             }
             //printf("dirEntry->DIR_Name[0] is 0x%X\n", dirEntry->DIR_Name[0]);
@@ -685,7 +685,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             if (dirEntry->DIR_Name[0] != (char)0xE5 &&
                 strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
                 ((dirEntry->DIR_Attr == 0x20) || (dirEntry->DIR_Attr == 0x0F))) {
-                    if (dirEntry->DIR_Name[strlen(file_name)] == 0x00 || dirEntry->DIR_Name[strlen(file_name)] == 0x20)
+                    if (dirEntry->DIR_Name[strlen(file_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (char)0x20)
                     {
                         printf("file already exists\n");
                         return true;
