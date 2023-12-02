@@ -411,7 +411,7 @@ void list_content(int img_fd, bpb_t bpb) {
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
             name[11] = '\0';
-            if(isDeleted == false && is_8_3_format(name))
+            if(isDeleted == false)// && is_8_3_format(name))
             {
                 // Check if it is a directory and apply blue color
                 if (dirEntry->DIR_Attr & 0x10) {
