@@ -221,6 +221,7 @@ int main(int argc, char const *argv[])
 }
 
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
+    printf("recursion?\n");
     if (!is_8_3_format(dir_name)) {
         printf("%s is not in FAT32 8.3 format\n", dir_name);
         return;
@@ -239,6 +240,7 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
 
     // Iterate over directory entries
     while (dir_cluster != 0xFFFFFFFF) {
+        printf("recursion?recursion?\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -266,9 +268,11 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             entryName[11] = '\0';
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
+                printf("here\n");
                 remove_directory(img_fd, bpb, entryName);
                 printf("Not yet seg fault3\n");
             } else { // File
+                printf("here2\n");
                 remove_file(img_fd, bpb, entryName);
                 printf("Not yet seg fault4\n");
             }
