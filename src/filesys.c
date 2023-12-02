@@ -322,6 +322,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
+        printf("here\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -335,6 +336,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            printf("there\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
@@ -378,6 +380,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     // Free the clusters used by the file
     uint32_t currentCluster = fileFirstCluster;
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
+        printf("where?\n");
         uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
         if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
@@ -885,7 +888,7 @@ void dbg_print_dentry(dentry_t *dentry) {
 }
 
 void print_boot_sector_info(bpb_t bpb) {
-    printf("Position of Root Cluster: %u\n", bpb.BPB_RootEntCnt);
+    printf("Position of Root Cluster: %u\n", bpb.BPB_RootClus);
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
     // Calculate and print total number of clusters in data region
