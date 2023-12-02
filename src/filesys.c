@@ -329,9 +329,10 @@ void list_content(int img_fd, bpb_t bpb) {
                 endOfDirectoryReached = true;
                 break;
             }
-
+            isDeleted = false;
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == 0xE5) {
+                isDeleted = true;
                 continue; // Correctly skip the deleted file
             }
 
@@ -339,12 +340,14 @@ void list_content(int img_fd, bpb_t bpb) {
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
             name[11] = '\0';
-
-            // Check if it is a directory and apply blue color
-            if (dirEntry->DIR_Attr & 0x10) {
-                printf("\033[34m%s\033[0m\n", name);  // Blue text for directories
-            } else {
-                printf("%s\n", name);  // Default text color for files
+            if(isDeleted == false)
+            {
+                // Check if it is a directory and apply blue color
+                if (dirEntry->DIR_Attr & 0x10) {
+                    printf("\033[34m%s\033[0m\n", name);  // Blue text for directories
+                } else {
+                    printf("%s\n", name);  // Default text color for files
+                }
             }
         }
 
