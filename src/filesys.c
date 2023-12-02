@@ -156,7 +156,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         {
             if(tokens->size == 3)
             {
-                if(is_directory(img_fd, bpb, tokens->items[1]) == true)
+                if(is_directory(img_fd, bpb, tokens->items[2]) == true)
                 {
                     remove_directory(img_fd, bpb, tokens->items[2]);
                 }
