@@ -337,13 +337,13 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
 
-            if (dirEntry->DIR_Name[0] == 0x00) break; // End of directory entries
+            if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
 
             if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
 
 
             if (strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 
-            && (dirEntry->DIR_Name[strlen(file_name)] == 0x00 || dirEntry->DIR_Name[strlen(file_name)] == 0x20)) {
+            && (dirEntry->DIR_Name[strlen(file_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (char)0x20)) {
                 // Check if entry is a file
                 if (!(dirEntry->DIR_Attr & 0x10)) {
                     fileFound = true;
