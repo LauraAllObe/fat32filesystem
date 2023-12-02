@@ -72,7 +72,7 @@ bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
-void remove_file(int imd_fd, bpb_t bpb, const char* file_name);
+void remove_file(int img_fd, bpb_t bpb, const char* file_name);
 //ADD FUNCTION DECLARATIONS HERE
 
 // other data structure, global variables, etc. define them in need.
@@ -211,7 +211,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-void remove_file(int imd_fd, bpb_t bpb, const char* file_name) {
+void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     if (!is_8_3_format(file_name)) {
         printf("%s is not in FAT32 8.3 format\n", file_name);
         return;
