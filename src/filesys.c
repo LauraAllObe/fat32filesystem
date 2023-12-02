@@ -158,7 +158,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             {
                 if(is_directory(img_fd, bpb, tokens->items[1]) == true)
                 {
-                    remove_directory(img_fd, bpb, tokens->items[1]);
+                    remove_directory(img_fd, bpb, tokens->items[2]);
                 }
                 else
                 {
