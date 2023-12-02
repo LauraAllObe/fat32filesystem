@@ -308,6 +308,10 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
             printf("Error reading directory entries.\n");
             return;
         }
+        if (bytesRead == -1) {
+            perror("Error reading directory entries");
+            return;
+        }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
@@ -326,7 +330,10 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
 
                     // Mark as deleted
                     dirEntry->DIR_Name[0] = (char)0xE5;
-                    pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i);
+                    if (pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i) == -1) {
+                        perror("Error writing directory entry");
+                        return;
+                    }
                     break;
                 }
             }
@@ -336,7 +343,10 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
 
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
-        pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+        if (pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset) == -1) {
+            perror("Error reading from FAT");
+            return;
+        }
     }
 
     if (!fileFound) {
@@ -349,10 +359,16 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
         uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
-        pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset);
+        if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
+            perror("Error reading from FAT");
+            return;
+        }
 
         uint32_t freeCluster = 0;
-        pwrite(img_fd, &freeCluster, sizeof(uint32_t), fatOffset);
+        if (pwrite(img_fd, &freeCluster, sizeof(uint32_t), fatOffset) == -1) {
+            perror("Error freeing cluster");
+            return;
+        }
 
         currentCluster = nextCluster;
     }
@@ -402,7 +418,6 @@ void list_content(int img_fd, bpb_t bpb) {
             bool isDeleted = false;
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == (char)0xE5) {
-                printf("here\n");
                 isDeleted = true;
                 continue; // Correctly skip the deleted file
             }
