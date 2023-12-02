@@ -301,7 +301,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
-        printf("1\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -315,7 +314,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
-            printf("2\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             if (dirEntry->DIR_Name[0] == 0x00) break; // End of directory entries
@@ -359,7 +357,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     // Free the clusters used by the file
     uint32_t currentCluster = fileFirstCluster;
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
-        printf("3\n");
         uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
         if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
@@ -773,14 +770,6 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
         return;
     }
 
-    // Mark the allocated cluster as the end of the cluster chain in the FAT
-    uint32_t end_of_chain = 0x0FFFFFFF; // End-of-chain marker for FAT32
-    uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(free_cluster, bpb);
-    if (pwrite(fd_img, &end_of_chain, sizeof(uint32_t), fat_offset) != sizeof(uint32_t)) {
-        perror("Error marking end of cluster chain");
-        return;
-    }
-
     // Create a directory entry for the new file
     dentry_t new_file_entry = {0};
     strncpy(new_file_entry.DIR_Name, file_name, 11); // Copy file_name to DIR_Name
@@ -940,7 +929,7 @@ uint32_t alloca_cluster(int fd, bpb_t bpb) {
 
         // Check if the cluster is free
         if (next_clus_num == 0) {
-            uint32_t end_of_chain = 0xFFFFFFFF;
+            uint32_t end_of_chain = 0x0FFFFFFF;
             ssize_t bytes_written = pwrite(fd, &end_of_chain, sizeof(uint32_t), offset);
 
             // Check if pwrite was successful
