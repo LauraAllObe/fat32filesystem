@@ -248,6 +248,7 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            printf("Not yet seg fault0\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             // Check for end of directory
@@ -259,25 +260,28 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             if (dirEntry->DIR_Name[0] == (char)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) {
                 continue;
             }
-
+            printf("Not yet seg fault1\n");
             // Construct full entry name
             char entryName[12];
             memcpy(entryName, dirEntry->DIR_Name, 11);
             entryName[11] = '\0';
-
+            printf("Not yet seg fault2\n");
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
                 remove_directory(img_fd, bpb, entryName);
+                printf("Not yet seg fault3\n");
             } else { // File
                 remove_file(img_fd, bpb, entryName);
+                printf("Not yet seg fault4\n");
             }
         }
-
+        printf("Not yet seg fault5\n");
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
         pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+        printf("Not yet seg fault6\n");
     }
-
+    printf("Not yet seg fault7\n");
     // Finally, remove the directory itself
     remove_file(img_fd, bpb, dir_name);
 }
