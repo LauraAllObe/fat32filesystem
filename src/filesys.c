@@ -766,6 +766,18 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Write '.' and '..' entries to the new directory
     write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(free_cluster, bpb));
     write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(free_cluster, bpb) + sizeof(dentry_t));
+    
+    //add an end-of-directory marker
+    dentry_t end_of_dir_entry = {0};
+    end_of_dir_entry.DIR_Name[0] = 0x00;  // End-of-directory marker
+
+    // The offset for the end-of-directory entry should be right after the '.' and '..' entries
+    uint32_t end_of_dir_offset = convert_clus_num_to_offset_in_data_region(free_cluster, bpb)
+                                 + 2 * sizeof(dentry_t); // Size of two entries ('.' and '..')
+
+    // Write the end-of-directory entry to the directory
+    write_dir_entry(fd_img, &end_of_dir_entry, end_of_dir_offset);
+
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
