@@ -160,7 +160,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             {
                 if(is_file(img_fd, bpb, tokens->items[1]) == false)
                 {
-                    remove_file(img_fid, bpb, tokens->items[1]);
+                    remove_file(img_fd, bpb, tokens->items[1]);
                 }
                 else
                 {
