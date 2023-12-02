@@ -252,7 +252,7 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // Check for end of directory
-            if (dirEntry->DIR_Name[0] == 0x00) {
+            if (dirEntry->DIR_Name[0] == (char)0x00) {
                 break; // End of directory entries
             }
 
