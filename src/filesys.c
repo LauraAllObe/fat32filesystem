@@ -1042,11 +1042,12 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
     // Define the values that indicate the end of a file and bad clusters in FAT32.
     uint32_t fat32_end_of_file = 0x0FFFFFFF;
+    uint32_t fat32_end_of_file2 = 0xFFFFFFFF;
     uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
     uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
 
     // Check if the cluster number falls within the range of bad clusters or is the end of the file.
-    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file  || clus_num == fat32_end_of_file2) {
         return true;
     }
 
