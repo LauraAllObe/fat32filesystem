@@ -423,14 +423,13 @@ void list_content(int img_fd, bpb_t bpb) {
 
     bool endOfDirectoryReached = false;
 
-    do {
-        uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
-        dataRegionOffset += (clusterNum - 2) * clusterSize;
+    while (!is_end_of_file_or_bad_cluster(clusterNum) && !endOfDirectoryReached) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(clusterNum, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
             printf("Error reading directory entries.\n");
-            return;
+            break;
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
@@ -441,10 +440,8 @@ void list_content(int img_fd, bpb_t bpb) {
                 endOfDirectoryReached = true;
                 break;
             }
-            bool isDeleted = false;
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == (char)0xE5) {
-                isDeleted = true;
                 continue; // Correctly skip the deleted file
             }
 
@@ -452,29 +449,21 @@ void list_content(int img_fd, bpb_t bpb) {
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
             name[11] = '\0';
-            if(isDeleted == false)// && is_8_3_format(name))
-            {
-                // Check if it is a directory and apply blue color
-                if (dirEntry->DIR_Attr & 0x10) {
-                    printf("\033[34m%s\033[0m\n", name);  // Blue text for directories
-                } else {
-                    printf("%s\n", name);  // Default text color for files
-                }
+            // Check if it is a directory and apply blue color
+            if (dirEntry->DIR_Attr & 0x10) {
+                printf("\033[34m%s\033[0m\n", name);  // Blue text for directories
+            } else {
+                printf("%s\n", name);  // Default text color for files
             }
         }
 
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
         pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
-
-        if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
-            endOfDirectoryReached = endOfDirectoryReached || (bytesRead < clusterSize);
-        }
-
         clusterNum = nextClusterNum;
-
-    } while (!is_end_of_file_or_bad_cluster(clusterNum) && !endOfDirectoryReached);
+    }
 }
+
 
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path) {
     char original_path[256];
