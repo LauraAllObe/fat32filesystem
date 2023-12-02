@@ -329,7 +329,7 @@ void list_content(int img_fd, bpb_t bpb) {
                 endOfDirectoryReached = true;
                 break;
             }
-            isDeleted = false;
+            bool isDeleted = false;
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == 0xE5) {
                 isDeleted = true;
