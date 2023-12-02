@@ -255,7 +255,7 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             }
 
             // Skip deleted entries and '.' and '..' entries
-            if (dirEntry->DIR_Name[0] == 0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) {
+            if (dirEntry->DIR_Name[0] == (char)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) {
                 continue;
             }
 
@@ -314,7 +314,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
 
             if (dirEntry->DIR_Name[0] == 0x00) break; // End of directory entries
 
-            if (dirEntry->DIR_Name[0] == 0xE5) continue; // Skip deleted entries
+            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
 
 
             if (strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 
@@ -325,7 +325,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
                     fileFirstCluster = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
 
                     // Mark as deleted
-                    dirEntry->DIR_Name[0] = 0xE5;
+                    dirEntry->DIR_Name[0] = (char)0xE5;
                     pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i);
                     break;
                 }
@@ -401,7 +401,7 @@ void list_content(int img_fd, bpb_t bpb) {
             }
             bool isDeleted = false;
             // Skip deleted entries
-            if (dirEntry->DIR_Name[0] == 0xE5) {
+            if (dirEntry->DIR_Name[0] == (char)0xE5) {
                 printf("here\n");
                 isDeleted = true;
                 continue; // Correctly skip the deleted file
@@ -411,7 +411,7 @@ void list_content(int img_fd, bpb_t bpb) {
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
             name[11] = '\0';
-            if(isDeleted == false)
+            if(isDeleted == false && is_8_3_format(name))
             {
                 // Check if it is a directory and apply blue color
                 if (dirEntry->DIR_Attr & 0x10) {
@@ -590,7 +590,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
                 return false;
             }
             // Skip deleted entries and check for directory name match
-            if (dirEntry->DIR_Name[0] != 0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
+            if (dirEntry->DIR_Name[0] != (char)0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
                     if (dirEntry->DIR_Name[strlen(dir_name)] == 0x00 || dirEntry->DIR_Name[strlen(dir_name)] == 0x20)
                     {
@@ -646,7 +646,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             //printf("dirEntry->DIR_Attr is 0x%X\n", dirEntry->DIR_Attr);
             //printf("dirEntry->DIR_Name[strlen(file_name)] is 0x%X\n", dirEntry->DIR_Name[strlen(file_name)]);
             // Skip deleted entries and check for file name match
-            if (dirEntry->DIR_Name[0] != 0xE5 &&
+            if (dirEntry->DIR_Name[0] != (char)0xE5 &&
                 strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
                 ((dirEntry->DIR_Attr == 0x20) || (dirEntry->DIR_Attr == 0x0F))) {
                     if (dirEntry->DIR_Name[strlen(file_name)] == 0x00 || dirEntry->DIR_Name[strlen(file_name)] == 0x20)
@@ -792,7 +792,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 return;
             }
 
-            if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == 0xE5) {
+            if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == (char)0xE5) {
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
