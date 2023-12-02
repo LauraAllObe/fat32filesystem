@@ -62,6 +62,7 @@ uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb)
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset);
 void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb);
 uint32_t alloca_cluster(int fd, bpb_t bpb);
+void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb);
 void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
@@ -724,6 +725,8 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         return;
     }
 
+    clear_cluster(fd_img, free_cluster, bpb);
+
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
     strncpy(new_dir_entry.DIR_Name, dir_name, 11);
@@ -769,6 +772,8 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
         printf("Failed to allocate a cluster for the new file\n");
         return;
     }
+
+    clear_cluster(fd_img, free_cluster, bpb);
 
     // Create a directory entry for the new file
     dentry_t new_file_entry = {0};
@@ -909,6 +914,25 @@ uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb) 
 uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb) {
     uint32_t data_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
     return data_region_offset + (clus_num - 2) * bpb.BPB_BytsPerSec;
+}
+
+void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb) {
+    uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+    char *emptyData = (char *)calloc(clusterSize, sizeof(char)); // Allocate and zero initialize
+
+    if (emptyData == NULL) {
+        perror("Failed to allocate memory for clearing cluster");
+        return;
+    }
+
+    uint32_t offset = convert_clus_num_to_offset_in_data_region(cluster_num, bpb);
+    ssize_t bytesWritten = pwrite(fd, emptyData, clusterSize, offset);
+
+    if (bytesWritten != clusterSize) {
+        perror("Failed to clear cluster");
+    }
+
+    free(emptyData);
 }
 
 uint32_t alloca_cluster(int fd, bpb_t bpb) {
