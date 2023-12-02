@@ -1042,7 +1042,7 @@ bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
     uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
 
     // Check if the cluster number falls within the range of bad clusters or is the end of the file.
-    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file  || clus_num == fat32_end_of_file2) {
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
         return true;
     }
 
