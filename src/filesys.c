@@ -226,8 +226,22 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
         printf("%s is not in FAT32 8.3 format\n", dir_name);
         return;
     }
+    //temporarily change current path to use directory_location to find start cluster #
+    char original_path[256];
+    strncpy(original_path, current_path, sizeof(original_path));
 
+    // Update the current path to include the directory to be removed
+    if (strcmp(current_path, "/") != 0) {
+        strncat(current_path, "/", sizeof(current_path) - strlen(current_path) - 1);
+    }
+    strncat(current_path, dir_name, sizeof(current_path) - strlen(current_path) - 1);
+
+    // Call directory_location with the updated current path
     uint32_t dir_cluster = directory_location(img_fd, bpb);
+
+    // Restore the original current path
+    strncpy(current_path, original_path, sizeof(current_path));
+
     if (dir_cluster == 0) {
         printf("Directory %s not found.\n", dir_name);
         return;
