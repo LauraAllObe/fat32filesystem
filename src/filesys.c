@@ -158,7 +158,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             }
             else
             {
-                if(is_file(img_fd, bpb, tokens->items[1]) == false)
+                if(is_file(img_fd, bpb, tokens->items[1]) == true)
                 {
                     remove_file(img_fd, bpb, tokens->items[1]);
                 }
@@ -323,7 +323,7 @@ void list_content(int img_fd, bpb_t bpb) {
         bool entriesPresentInCluster = false;
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
-            printf("%s is 0x%X\n", dirEntry->DIR_Name, dirEntry->DIR_Name[0]);
+            //printf("%s is 0x%X\n", dirEntry->DIR_Name, dirEntry->DIR_Name[0]);
 
             // End of directory entries marker
             if (dirEntry->DIR_Name[0] == 0x00) {
