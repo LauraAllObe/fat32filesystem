@@ -332,6 +332,7 @@ void list_content(int img_fd, bpb_t bpb) {
             bool isDeleted = false;
             // Skip deleted entries
             if (dirEntry->DIR_Name[0] == 0xE5) {
+                printf("here\n");
                 isDeleted = true;
                 continue; // Correctly skip the deleted file
             }
