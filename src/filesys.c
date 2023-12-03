@@ -151,10 +151,6 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
         return;
     }
 
-    // Calculate the full path of the file
-    char fullPath[512]; // Adjust size as needed
-    snprintf(fullPath, sizeof(fullPath), "%s%s", current_path, filename);
-
     // Calculate the starting cluster of the file
     uint32_t startCluster = find_file_cluster(img_fd, bpb, filename);
     if (startCluster == 0) {
@@ -175,16 +171,6 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     uint32_t clusterOffset = logicalOffset / clusterSize;
     uint32_t intraClusterOffset = logicalOffset % clusterSize;
 
-    /*// Follow the cluster chain to find the correct cluster
-    uint32_t currentCluster = startCluster;
-    for (uint32_t i = 0; i < clusterOffset; ++i) {
-        currentCluster = getNextClusterFromFAT(currentCluster, img_fd, bpb);
-        if (is_end_of_file_or_bad_cluster(currentCluster)) {
-            printf("Error: Reached end of file or encountered a bad cluster.\n");
-            free(buffer);
-            return;
-        }
-    }*/
     // Follow the cluster chain to find the correct cluster
     uint32_t currentCluster = startCluster;
     for (uint32_t i = 0; i < clusterOffset; ++i) {
@@ -192,19 +178,19 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
         uint32_t nextClusterNum;
         ssize_t bytesRead = pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
 
-    if (bytesRead != sizeof(uint32_t)) {
-        printf("Error reading FAT entry.\n");
-        free(buffer);
-        return;
-    }
+        if (bytesRead != sizeof(uint32_t)) {
+            printf("Error reading FAT entry.\n");
+            free(buffer);
+            return;
+        }
 
-    if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
-        printf("Error: Reached end of file or encountered a bad cluster.\n");
-        free(buffer);
-        return;
-    }
+        if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
+            printf("Error: Reached end of file or encountered a bad cluster.\n");
+            free(buffer);
+            return;
+        }
 
-    currentCluster = nextClusterNum;
+        currentCluster = nextClusterNum;
     }
 
     // Calculate the actual offset in the FAT32 image
