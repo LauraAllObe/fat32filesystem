@@ -396,7 +396,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
-=        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -409,7 +409,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
-=            dirEntry = (dentry_t *)(buffer + i);
+            dirEntry = (dentry_t *)(buffer + i);
 
             if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
 
@@ -452,7 +452,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     // Free the clusters used by the file
     uint32_t currentCluster = fileFirstCluster;
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
-=        uint32_t nextCluster;
+        uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
         if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
             perror("Error reading from FAT");
@@ -886,7 +886,6 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     uint32_t bytesProcessed = 0;
-    bool spaceFound = false;
 
     while (true) {
         uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num, bpb);
