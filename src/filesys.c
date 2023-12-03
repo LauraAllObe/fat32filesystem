@@ -74,6 +74,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
 void remove_file(int img_fd, bpb_t bpb, const char* file_name);
+void remove_directories(int img_fd, bpb_t bpb, const char* dir_name);
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name);
 //ADD FUNCTION DECLARATIONS HERE
 
@@ -162,7 +163,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             {
                 if(is_directory(img_fd, bpb, tokens->items[2]) == true)
                 {
-                    remove_directory(img_fd, bpb, tokens->items[2]);
+                    remove_directories(img_fd, bpb, tokens->items[2]);
                 }
                 else
                 {
@@ -224,7 +225,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
+void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
     printf("recursion?\n");
     if (!is_8_3_format(dir_name)) {
         printf("%s is not in FAT32 8.3 format\n", dir_name);
@@ -287,7 +288,7 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
                 printf("here\n");
-                remove_directory(img_fd, bpb, entryName);
+                remove_directories(img_fd, bpb, entryName);
                 printf("Not yet seg fault3\n");
             } else { // File
                 printf("here2\n");
@@ -303,7 +304,75 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
     }
     printf("Not yet seg fault7\n");
     // Finally, remove the directory itself
-    remove_file(img_fd, bpb, dir_name);
+    remove_directory(img_fd, bpb, dir_name);
+}
+
+void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
+    if (!is_8_3_format(dir_name)) {
+        printf("%s is not in FAT32 8.3 format\n", dir_name);
+        return;
+    }
+
+    uint32_t dir_cluster = directory_location(img_fd, bpb);
+    if (dir_cluster == 0) {
+        printf("Error: Directory not found.\n");
+        return;
+    }
+
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
+    bool dirFound = false;
+
+    while (!is_end_of_file_or_bad_cluster(dir_cluster)) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+
+        if (bytesRead <= 0) {
+            printf("Error reading directory entries.\n");
+            return;
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+
+            if (dirEntry->DIR_Name[0] == (char)0x00) {
+                printf("Directory not found.\n");
+                return; // End of directory entries
+            }
+
+            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
+
+            if (strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 &&
+                (dirEntry->DIR_Name[strlen(dir_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(dir_name)] == (char)0x20)) {
+                // Check if entry is a directory
+                if (dirEntry->DIR_Attr & 0x10) {
+                    dirFound = true;
+                    dirEntry->DIR_Name[0] = (char)0xE5; // Mark as deleted
+                    if (pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i) == -1) {
+                        perror("Error writing directory entry");
+                        return;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (dirFound) break;
+
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+        if (pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset) == -1) {
+            perror("Error reading from FAT");
+            return;
+        }
+    }
+
+    if (!dirFound) {
+        printf("Directory not found.\n");
+        return;
+    }
 }
 
 void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
