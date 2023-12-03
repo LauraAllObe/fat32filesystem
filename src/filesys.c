@@ -226,7 +226,6 @@ int main(int argc, char const *argv[])
 }
 
 void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
-    printf("recursion?\n");
     if (!is_8_3_format(dir_name)) {
         printf("%s is not in FAT32 8.3 format\n", dir_name);
         return;
@@ -259,7 +258,6 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
 
     // Iterate over directory entries
     while (dir_cluster != 0xFFFFFFFF) {
-        printf("recursion?recursion?\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -269,7 +267,6 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
-            printf("0\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             // Check for end of directory
@@ -287,22 +284,15 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
             entryName[11] = '\0';
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
-                printf("here\n");
                 remove_directories(img_fd, bpb, entryName);
-                printf("Not yet seg fault3\n");
             } else { // File
-                printf("here2\n");
                 remove_file(img_fd, bpb, entryName);
-                printf("Not yet seg fault4\n");
             }
         }
-        printf("Not yet seg fault5\n");
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
         pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
-        printf("Not yet seg fault6\n");
     }
-    printf("Not yet seg fault7\n");
     // Finally, remove the directory itself
     remove_directory(img_fd, bpb, dir_name);
 }
@@ -395,7 +385,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
-        printf("SIM\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -409,7 +398,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
-            printf("SA\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
@@ -453,7 +441,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     // Free the clusters used by the file
     uint32_t currentCluster = fileFirstCluster;
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
-        printf("LA\n");
         uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
         if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
@@ -469,7 +456,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
 
         currentCluster = nextCluster;
     }
-    printf("BIM\n");
 }
 
 void list_content(int img_fd, bpb_t bpb) {
