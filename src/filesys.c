@@ -272,12 +272,12 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // Check for end of directory
-            if (dirEntry->DIR_Name[0] == (char)0x00) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0x00) {
                 break; // End of directory entries
             }
 
             // Skip deleted entries and '.' and '..' entries
-            if (dirEntry->DIR_Name[0] == (char)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) {
                 continue;
             }
             // Construct full entry name
@@ -342,20 +342,20 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
 
-            if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
+            if (dirEntry->DIR_Name[0] == (uint8_t)0x00) break; // End of directory entries
 
-            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
+            if (dirEntry->DIR_Name[0] == (uint8_t)0xE5) continue; // Skip deleted entries
 
 
             if (strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 
-            && (dirEntry->DIR_Name[strlen(file_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (char)0x20)) {
+            && (dirEntry->DIR_Name[strlen(file_name)] == (uint8_t)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (uint8_t)0x20)) {
                 // Check if entry is a file
                 if (!(dirEntry->DIR_Attr & 0x10)) {
                     fileFound = true;
                     fileFirstCluster = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
 
                     // Mark as deleted
-                    dirEntry->DIR_Name[0] = (char)0xE5;
+                    dirEntry->DIR_Name[0] = (uint8_t)0xE5;
                     if (pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i) == -1) {
                         perror("Error writing directory entry");
                         return;
@@ -436,12 +436,12 @@ void list_content(int img_fd, bpb_t bpb) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory entries marker
-            if (dirEntry->DIR_Name[0] == (char)0x00) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0x00) {
                 endOfDirectoryReached = true;
                 break;
             }
             // Skip deleted entries
-            if (dirEntry->DIR_Name[0] == (char)0xE5) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0xE5) {
                 continue; // Correctly skip the deleted file
             }
 
@@ -550,13 +550,13 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
             for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
                 dirEntry = (dentry_t *)(buffer + i);
-                if (dirEntry->DIR_Name[0] == (char)0x00) { // End of directory entries
+                if (dirEntry->DIR_Name[0] == (uint8_t)0x00) { // End of directory entries
                     printf("end of directory reached\n");
                     found = false;
                     break;
                 }
                 if (strncmp(dirEntry->DIR_Name, token, strlen(token)) == 0 && (dirEntry->DIR_Attr & 0x10)) {
-                    if (dirEntry->DIR_Name[strlen(token)] == (char)0x00 || dirEntry->DIR_Name[strlen(token)] == (char)0x20)
+                    if (dirEntry->DIR_Name[strlen(token)] == (uint8_t)0x00 || dirEntry->DIR_Name[strlen(token)] == (uint8_t)0x20)
                     {
                         found = true;
                         clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
@@ -616,13 +616,13 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
-            if (dirEntry->DIR_Name[0] == (char)0x00) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0x00) {
                 return false;
             }
             // Skip deleted entries and check for directory name match
-            if (dirEntry->DIR_Name[0] != (char)0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
+            if (dirEntry->DIR_Name[0] != (uint8_t)0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
-                    if (dirEntry->DIR_Name[strlen(dir_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(dir_name)] == (char)0x20)
+                    if (dirEntry->DIR_Name[strlen(dir_name)] == (uint8_t)0x00 || dirEntry->DIR_Name[strlen(dir_name)] == (uint8_t)0x20)
                     {
                         printf("directory already exists\n");
                         return true;
@@ -668,7 +668,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
-            if (dirEntry->DIR_Name[0] == (char)0x00) {
+            if (dirEntry->DIR_Name[0] == (uint8_t)0x00) {
                 return false;
             }
             //printf("dirEntry->DIR_Name[0] is 0x%X\n", dirEntry->DIR_Name[0]);
@@ -676,10 +676,10 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             //printf("dirEntry->DIR_Attr is 0x%X\n", dirEntry->DIR_Attr);
             //printf("dirEntry->DIR_Name[strlen(file_name)] is 0x%X\n", dirEntry->DIR_Name[strlen(file_name)]);
             // Skip deleted entries and check for file name match
-            if (dirEntry->DIR_Name[0] != (char)0xE5 &&
+            if (dirEntry->DIR_Name[0] != (uint8_t)0xE5 &&
                 strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
                 ((dirEntry->DIR_Attr == 0x20) || (dirEntry->DIR_Attr == 0x0F))) {
-                    if (dirEntry->DIR_Name[strlen(file_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (char)0x20)
+                    if (dirEntry->DIR_Name[strlen(file_name)] == (uint8_t)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (uint8_t)0x20)
                     {
                         return true;
                     }
@@ -838,7 +838,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 return;
             }
 
-            if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == (char)0xE5) {
+            if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == (uint8_t)0xE5) {
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
@@ -1038,11 +1038,12 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
     // Define the values that indicate the end of a file and bad clusters in FAT32.
     uint32_t fat32_end_of_file = 0x0FFFFFFF;
+    uint32_t fat32_end_of_file2 = 0xFFFFFFFF;
     uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
     uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
 
     // Check if the cluster number falls within the range of bad clusters or is the end of the file.
-    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file) {
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file || clus_num == fat32_end_of_file2) {
         return true;
     }
 
