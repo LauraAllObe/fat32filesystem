@@ -243,9 +243,6 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
     // Call directory_location with the updated current path
     uint32_t dir_cluster = directory_location(img_fd, bpb);
 
-    // Restore the original current path
-    strncpy(current_path, original_path, sizeof(current_path));
-
     if (dir_cluster == 0) {
         printf("Directory %s not found.\n", dir_name);
         return;
@@ -297,6 +294,8 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
     }
     // Finally, remove the directory itself
     remove_directory(img_fd, bpb, dir_name);
+    // Restore the original current path
+    strncpy(current_path, original_path, sizeof(current_path));
 }
 
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
