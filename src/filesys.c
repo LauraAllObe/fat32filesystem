@@ -66,7 +66,9 @@ void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb);
 void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
+//return values: 0 == false, 1 == true, -1 == error on read, -2 == name format error
 int is_directory(int fd_img, bpb_t bpb, const char* dir_name);
+//return values: 0 == false, 1 == true, -1 == error on read, -2 == name format error
 int is_file(int fd_img, bpb_t bpb, const char* file_name);
 bool is_8_3_format(const char* name);
 bool is_8_3_format_directory(const char* name);
@@ -654,7 +656,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
     return clusterNum;
 }
 
-bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
+int is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
         return -2; // Return true if not in 8.3 format
