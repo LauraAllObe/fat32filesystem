@@ -264,9 +264,9 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     char buffer[clusterSize];
     dentry_t *dirEntry;
-
+    bool endOfDirectoryReached == false;
     // Iterate over directory entries
-    while (dir_cluster != 0xFFFFFFFF) {
+    while (!is_end_of_file_or_bad_cluster(dir_cluster) && !endOfDirectoryReached) {
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -280,6 +280,7 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
 
             // Check for end of directory
             if (dirEntry->DIR_Name[0] == (char)0x00) {
+                endOfDirectoryReached = true;
                 break; // End of directory entries
             }
 
