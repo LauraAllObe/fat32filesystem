@@ -355,7 +355,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
                     fileFirstCluster = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
 
                     // Mark as deleted
-                    dirEntry->DIR_Name[0] = (uint8_t)0xE5;
+                    dirEntry->DIR_Name[0] = 0xE5;
                     if (pwrite(img_fd, dirEntry, sizeof(dentry_t), dataRegionOffset + i) == -1) {
                         perror("Error writing directory entry");
                         return;
