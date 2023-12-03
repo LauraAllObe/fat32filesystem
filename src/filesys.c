@@ -66,8 +66,8 @@ void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb);
 void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
-bool is_directory(int fd_img, bpb_t bpb, const char* dir_name);
-bool is_file(int fd_img, bpb_t bpb, const char* file_name);
+int is_directory(int fd_img, bpb_t bpb, const char* dir_name);
+int is_file(int fd_img, bpb_t bpb, const char* file_name);
 bool is_8_3_format(const char* name);
 bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
@@ -129,12 +129,17 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("mkdir command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
+            int value = is_directory(img_fd, bpb, tokens->items[2]);
             if(strcmp(tokens->items[1], ".") == 0 || strcmp(tokens->items[1], "..") == 0)
                 printf("users can not make . or .. directories.\n");
-            else if(is_directory(img_fd, bpb, tokens->items[1]) == false)
-            {
+            else if(value == 0)
                 new_directory(img_fd, bpb, tokens->items[1]);
-            }
+            else if(value == 1)
+                printf("directory already exists\n");
+            else if(value == -1)
+                printf("data region could not be read\n");
+            else if(value == -2)
+                printf("%s is not in fat32 8.3 format\n", tokens->items[2]);
         }
         else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size > 2)
             printf("creat command does not take more than two arguments.\n");
@@ -142,14 +147,17 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("creat command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
         {
-            if(is_file(img_fd, bpb, tokens->items[1]) == false)
+            int value = is_file(img_fd, bpb, tokens->items[1]);
+            if(value == 0)
             {
                 new_file(img_fd, bpb, tokens->items[1]);
             }
-            else
-            {
+            else if(value == 1)
                 printf("file already exists\n");
-            }
+            else if(value == -1)
+                printf("data region could not be read\n");
+            else if(value == -2)
+                printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size > 3)
             printf("rm command does not take more than three arguments\n");
@@ -161,25 +169,27 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         {
             if(tokens->size == 3)
             {
-                if(is_directory(img_fd, bpb, tokens->items[2]) == true)
-                {
+                int value = is_directory(img_fd, bpb, tokens->items[2]);
+                if(value == 1)
                     remove_directories(img_fd, bpb, tokens->items[2]);
-                }
-                else
-                {
+                else if(value == 0)
                     printf("Directory named %s does not exist in the current directory.\n", tokens->items[1]);
-                }
+                else if(value == -1)
+                    printf("data region could not be read\n");
+                else if(value == -2)
+                    printf("%s is not in fat32 8.3 format\n", tokens->items[2]);
             }
             else
             {
-                if(is_file(img_fd, bpb, tokens->items[1]) == true)
-                {
+                int value = is_file(img_fd, bpb, tokens->items[1]);
+                if(value == 1)
                     remove_file(img_fd, bpb, tokens->items[1]);
-                }
-                else
-                {
+                else if(value == 0)
                     printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
-                }
+                else if(value == -1)
+                    printf("data region could not be read\n");
+                else if(value == -2)
+                    printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
             }
         }
         // else if cmd is ...
@@ -282,20 +292,18 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
                 remove_directories(img_fd, bpb, entryName);
-                printf("here\n");
             } else { // File
                 remove_file(img_fd, bpb, entryName);
-                printf("here\n");
             }
         }
         // Get next cluster number from FAT
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
         pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
     }
-    // Finally, remove the directory itself
-    remove_directory(img_fd, bpb, dir_name);
     // Restore the original current path
     strncpy(current_path, original_path, sizeof(current_path));
+    // Finally, remove the directory itself
+    remove_directory(img_fd, bpb, dir_name);
 }
 
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
@@ -386,8 +394,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
-        printf("?");
-        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+=        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
@@ -400,8 +407,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
-            printf("!");
-            dirEntry = (dentry_t *)(buffer + i);
+=            dirEntry = (dentry_t *)(buffer + i);
 
             if (dirEntry->DIR_Name[0] == (char)0x00) break; // End of directory entries
 
@@ -444,8 +450,7 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     // Free the clusters used by the file
     uint32_t currentCluster = fileFirstCluster;
     while (!is_end_of_file_or_bad_cluster(currentCluster)) {
-        printf(";");
-        uint32_t nextCluster;
+=        uint32_t nextCluster;
         uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
         if (pread(img_fd, &nextCluster, sizeof(uint32_t), fatOffset) == -1) {
             perror("Error reading from FAT");
@@ -652,8 +657,7 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
-        printf("%s is not in fat32 8.3 format\n", dir_name);
-        return true; // Return true if not in 8.3 format
+        return -2; // Return true if not in 8.3 format
     }
 
     uint32_t clusterNum = directory_location(fd_img, bpb);
@@ -662,7 +666,6 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     uint32_t bufferSize = bpb.BPB_BytsPerSec * bpb.BPB_SecPerClus;
     char buffer[bufferSize];
     dentry_t *dirEntry;
-    bool found = false;
 
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
@@ -670,8 +673,7 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
-            printf("data region could not be read\n");
-            return true;
+            return -1;
         }
 
         for (uint32_t i = 0; i < bytesRead; i += dirEntrySize) {
@@ -679,15 +681,14 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
             // End of directory marker
             if (dirEntry->DIR_Name[0] == (char)0x00) {
-                return false;
+                return 0;
             }
             // Skip deleted entries and check for directory name match
             if (dirEntry->DIR_Name[0] != (char)0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
                     if (dirEntry->DIR_Name[strlen(dir_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(dir_name)] == (char)0x20)
                     {
-                        printf("directory already exists\n");
-                        return true;
+                        return 1;
                     }
             }
         }
@@ -697,14 +698,13 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-    return false;
+    return 0;
 }
 
-bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
+int is_file(int fd_img, bpb_t bpb, const char* file_name) {
 
     if (!is_8_3_format(file_name)) {
-        printf("%s is not in fat32 8.3 format\n", file_name);
-        return true; // Return true if not in 8.3 format
+        return -2; // Return true if not in 8.3 format
     }
 
     uint32_t clusterNum = directory_location(fd_img, bpb);
@@ -713,7 +713,6 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
     uint32_t bufferSize = bpb.BPB_BytsPerSec * bpb.BPB_SecPerClus;
     char buffer[bufferSize];
     dentry_t *dirEntry;
-    bool found = false;
 
     do {
         uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
@@ -721,8 +720,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
-            printf("data region could not be read\n");
-            return true;
+            return -1;
         }
 
         for (uint32_t i = 0; i < bytesRead; i += dirEntrySize) {
@@ -730,7 +728,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
 
             // End of directory marker
             if (dirEntry->DIR_Name[0] == (char)0x00) {
-                return false;
+                return 0;
             }
             //printf("dirEntry->DIR_Name[0] is 0x%X\n", dirEntry->DIR_Name[0]);
             //printf("dirEntry->DIR_Name is %s\n", dirEntry->DIR_Name);
@@ -742,7 +740,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
                 ((dirEntry->DIR_Attr == 0x20) || (dirEntry->DIR_Attr == 0x0F))) {
                     if (dirEntry->DIR_Name[strlen(file_name)] == (char)0x00 || dirEntry->DIR_Name[strlen(file_name)] == (char)0x20)
                     {
-                        return true;
+                        return 1;
                     }
             }
         }
@@ -753,7 +751,7 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-    return false;
+    return 0;
 }
 
 bool is_8_3_format(const char* name) {
