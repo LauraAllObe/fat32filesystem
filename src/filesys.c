@@ -1030,7 +1030,13 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
         // Mark the new cluster as the end of the chain
         uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num, bpb);
         uint32_t end_of_file = 0xFFFFFFFF;
-        pwrite(fd, &end_of_file, sizeof(uint32_t), new_offset);
+        if (pwrite(fd, &end_of_file, sizeof(uint32_t), new_offset) != sizeof(uint32_t)) {
+            perror("Error writing end of file marker in FAT");
+            return;
+        }
+
+        // Update the current cluster pointer
+        *current_clus_num_ptr = new_clus_num;
     }
 }
 
