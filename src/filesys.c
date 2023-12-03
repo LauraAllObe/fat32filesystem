@@ -963,15 +963,28 @@ void dbg_print_dentry(dentry_t *dentry) {
 }
 
 void print_boot_sector_info(bpb_t bpb) {
-    printf("Position of Root Cluster: %u\n", bpb.BPB_RootClus);
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
-    // Calculate and print total number of clusters in data region
-    uint32_t totalClusters = (bpb.BPB_TotSec32 - bpb.BPB_RsvdSecCnt) / bpb.BPB_SecPerClus;
-    printf("Total # of Clusters in Data Region: %u\n", totalClusters);
-    printf("# of Entries in One FAT: %u\n", bpb.BPB_NumFATs);
-    uint32_t imageSize = bpb.BPB_TotSec32 * bpb.BPB_BytsPerSec;
-    printf("Size of Image (in bytes): %u\n", imageSize);
+
+    // Calculate the First Data Sector
+    uint32_t firstDataSector = bpb.BPB_RsvdSecCnt + (bpb.BPB_NumFATs * bpb.BPB_FATSz32);
+    printf("First Data Sector: %u\n", firstDataSector);
+
+    // Calculate total sectors
+    uint32_t totalSectors = bpb.BPB_TotSec32;
+
+    // Calculate total clusters in Data Region
+    uint32_t totalDataSectors = totalSectors - firstDataSector;
+    uint32_t totalClusters = totalDataSectors / bpb.BPB_SecPerClus;
+    printf("Total clusters in Data Region: %u\n", totalClusters);
+
+    // Calculate number of entries in one FAT
+    uint32_t fatSize = bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec; // Total size of one FAT in bytes
+    uint32_t numEntriesInOneFAT = fatSize / sizeof(uint32_t); // Each FAT entry is 4 bytes (uint32_t)
+    printf("# of entries in one FAT: %u\n", numEntriesInOneFAT);
+
+    printf("Size of Image (bytes): %u\n", totalSectors * bpb.BPB_BytsPerSec);
+    printf("Root Cluster: %u\n", bpb.BPB_RootClus);
 }
 
 //mounts the fat23 image file
