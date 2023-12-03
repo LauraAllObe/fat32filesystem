@@ -285,8 +285,10 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
             // Remove file or recursively remove directory
             if (dirEntry->DIR_Attr & 0x10) { // Directory
                 remove_directories(img_fd, bpb, entryName);
+                printf("here\n");
             } else { // File
                 remove_file(img_fd, bpb, entryName);
+                printf("here\n");
             }
         }
         // Get next cluster number from FAT
