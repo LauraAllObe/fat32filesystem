@@ -326,7 +326,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
     uint32_t fileFirstCluster;
 
     while (dir_cluster != 0xFFFFFFFF) {
-        printf("here\n");
         uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
@@ -984,7 +983,7 @@ uint32_t alloca_cluster(int fd, bpb_t bpb) {
 
         // Check if the cluster is free
         if (next_clus_num == 0) {
-            uint32_t end_of_chain = 0x0FFFFFFF;
+            uint32_t end_of_chain = 0xFFFFFFFF;
             ssize_t bytes_written = pwrite(fd, &end_of_chain, sizeof(uint32_t), offset);
 
             // Check if pwrite was successful
@@ -1037,13 +1036,11 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
     // Define the values that indicate the end of a file and bad clusters in FAT32.
-    uint32_t fat32_end_of_file = 0x0FFFFFFF;
-    uint32_t fat32_end_of_file2 = 0xFFFFFFFF;
-    uint32_t fat32_bad_cluster_min = 0x0FFFFFF8;
-    uint32_t fat32_bad_cluster_max = 0x0FFFFFFF;
+    uint32_t fat32_bad_cluster_min = 0xFFFFFF8;
+    uint32_t fat32_bad_cluster_max = 0xFFFFFFFF;
 
     // Check if the cluster number falls within the range of bad clusters or is the end of the file.
-    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max) || clus_num == fat32_end_of_file || clus_num == fat32_end_of_file2) {
+    if ((clus_num >= fat32_bad_cluster_min && clus_num <= fat32_bad_cluster_max)) {
         return true;
     }
 
