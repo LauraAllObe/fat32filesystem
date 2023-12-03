@@ -618,7 +618,6 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
             for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
                 dirEntry = (dentry_t *)(buffer + i);
                 if (dirEntry->DIR_Name[0] == (char)0x00) { // End of directory entries
-                    printf("end of directory reached\n");
                     found = false;
                     break;
                 }
