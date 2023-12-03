@@ -34,11 +34,11 @@ Implement exit and info commands. A basic Makefile (also from project 1).
 
 ### Part 6: Delete [10 points]
 - **Responsibilities**: 
-- **Assigned to**: 
+- **Assigned to**: Laura Obermaier
 
-### Extra Credit (__)
+### Extra Credit (rm -r)
 - **Responsibilities**: 
-- **Assigned to**: 
+- **Assigned to**: Laura Obermaier
 
 ## File Listing
 ```
