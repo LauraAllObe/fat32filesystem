@@ -175,7 +175,7 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     uint32_t clusterOffset = logicalOffset / clusterSize;
     uint32_t intraClusterOffset = logicalOffset % clusterSize;
 
-    // Follow the cluster chain to find the correct cluster
+    /*// Follow the cluster chain to find the correct cluster
     uint32_t currentCluster = startCluster;
     for (uint32_t i = 0; i < clusterOffset; ++i) {
         currentCluster = getNextClusterFromFAT(currentCluster, img_fd, bpb);
@@ -184,6 +184,27 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
             free(buffer);
             return;
         }
+    }*/
+    // Follow the cluster chain to find the correct cluster
+    uint32_t currentCluster = startCluster;
+    for (uint32_t i = 0; i < clusterOffset; ++i) {
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster);
+        uint32_t nextClusterNum;
+        ssize_t bytesRead = pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
+
+    if (bytesRead != sizeof(uint32_t)) {
+        printf("Error reading FAT entry.\n");
+        free(buffer);
+        return;
+    }
+
+    if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
+        printf("Error: Reached end of file or encountered a bad cluster.\n");
+        free(buffer);
+        return;
+    }
+
+    currentCluster = nextClusterNum;
     }
 
     // Calculate the actual offset in the FAT32 image
