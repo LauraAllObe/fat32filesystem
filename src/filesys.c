@@ -7,33 +7,36 @@
 #include <stdbool.h>
 
 typedef struct __attribute__((packed)) BPB {
-        char BS_jmpBoot[3];
-        char BS_OEMName[8];
-        uint16_t BPB_BytsPerSec;
-        uint8_t BPB_SecPerClus;
-        uint16_t BPB_RsvdSecCnt;
-        uint8_t BPB_NumFATs;
-        uint16_t BPB_RootEntCnt;
-        uint16_t BPB_TotSec16;
-        uint8_t BPB_Media;
-        uint16_t BPB_FATSz16;
-        uint32_t BPB_FATSz32;
-        uint16_t BPB_SecPerTrk;
-        uint16_t BPB_NumHeads;
-        uint32_t BPB_HiddSec;
-        uint32_t BPB_TotSec32;
-        uint32_t BPB_RootClus;
+    char BS_jmpBoot[3];
+    char BS_OEMName[8];
+    uint16_t BPB_BytsPerSec;
+    uint8_t BPB_SecPerClus;
+    uint16_t BPB_RsvdSecCnt;
+    uint8_t BPB_NumFATs;
+    uint16_t BPB_RootEntCnt;
+    uint16_t BPB_TotSec16;
+    uint8_t BPB_Media;
+    uint16_t BPB_FATSz16;
+    uint16_t BPB_SecPerTrk;
+    uint16_t BPB_NumHeads;
+    uint32_t BPB_HiddSec;
+    uint32_t BPB_TotSec32;
+    uint32_t BPB_FATSz32;
+    uint16_t BPB_ExtFlags;
+    uint16_t BPB_FSVer;
+    uint32_t BPB_RootClus;
+    uint16_t BPB_FSInfo;
+    uint16_t BPB_BkBootSec;
+    char BPB_Reserved[12];
 } bpb_t;
 
 
 typedef struct __attribute__((packed)) directory_entry {
     char DIR_Name[11];
     uint8_t DIR_Attr;
-    char padding_1[8]; // DIR_NTRes, DIR_CrtTimeTenth, DIR_CrtTime, DIR_CrtDate, 
-                       // DIR_LstAccDate. Since these fields are not used in
-                       // Project 3, just define as a placeholder.
+    char padding_1[8];
     uint16_t DIR_FstClusHI;
-    char padding_2[4]; // DIR_WrtTime, DIR_WrtDate
+    char padding_2[4];
     uint16_t DIR_FstClusLO;
     uint32_t DIR_FileSize;
 } dentry_t;
@@ -49,23 +52,23 @@ tokenlist * get_tokens(char *input);
 tokenlist * new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
-void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb);
 void print_boot_sector_info(bpb_t bpb);
 void dbg_print_dentry(dentry_t *dentry);
 bpb_t mount_fat32(int img_fd);
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num);
-uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num);
-uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset);
-uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num);
+uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb);
+uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset, bpb_t bpb);
+uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb);
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset);
 void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb);
-uint32_t alloca_cluster(int fd);
-void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr);
+uint32_t alloca_cluster(int fd, bpb_t bpb);
+void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name);
 bool is_file(int fd_img, bpb_t bpb, const char* file_name);
 bool is_8_3_format(const char* name);
+bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
@@ -255,23 +258,19 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("mkdir command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
-            printf("here!!\n");
-            if(is_directory(img_fd, bpb, tokens->items[1]) == false)
+            if(strcmp(tokens->items[1], ".") == 0 || strcmp(tokens->items[1], "..") == 0)
+                printf("users can not make . or .. directories\n");
+            else if(is_directory(img_fd, bpb, tokens->items[1]) == false)
             {
-                printf("directory doesn't exist\n");
                 new_directory(img_fd, bpb, tokens->items[1]);
             }
-            else
-                printf("directory exists\n");
         }
         else if(strcmp(tokens->items[0], "creat") == 0 && tokens->size > 2)
             printf("creat command does not take more than two arguments\n");
         else if (strcmp(tokens->items[0], "creat") == 0)
         {
-            printf("here!!!\n");
             if(is_file(img_fd, bpb, tokens->items[1]) == false)
             {
-                printf("file doesn't exist\n");
                 new_file(img_fd, bpb, tokens->items[1]);
             }
             else
@@ -324,30 +323,8 @@ int main(int argc, char const *argv[])
     uint32_t offset = 0;
     uint32_t curr_clus_num = 3;
     uint32_t next_clus_num = 0;
-    uint32_t BPB_SecPerClus = 1;
-    uint32_t BPB_FATSz32 = 1009;
-    uint32_t max_clus_num = BPB_FATSz32 / BPB_SecPerClus;
+    uint32_t max_clus_num = bpb.BPB_FATSz32 / bpb.BPB_SecPerClus;
     uint32_t min_clus_num = 2;
-
-    while (curr_clus_num >= min_clus_num && curr_clus_num <= max_clus_num) {
-        // if the cluster number is not in the range, this cluster is:
-        // 1. reserved cluster
-        // 2. end of the file
-        // 3. bad cluster.
-        // No matter which kind of number, we can consider it is the end of a file.
-        if (is_end_of_file_or_bad_cluster(curr_clus_num)) {
-            printf("This cluster is the end of a file or a bad cluster: %u\n", curr_clus_num);
-            break; // Exit the loop if it's the end of a file or a bad cluster.
-        }
-
-	process_directory_entries(img_fd, curr_clus_num, bpb);
-
-        offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
-        pread(img_fd, &next_clus_num, sizeof(uint32_t), offset);
-        //printf("current cluster number: %u, next cluster number: %u\n", \
-                //curr_clus_num, next_clus_num);
-        curr_clus_num = next_clus_num;
-    }
 
     // 3. main procees
     main_process(img_fd, img_path, bpb);
@@ -366,9 +343,6 @@ void list_content(int img_fd, bpb_t bpb) {
     // Special handling for root directory
     if (strcmp(current_path, "/") == 0) {
         clusterNum = bpb.BPB_RootClus; // The root cluster number is in the BPB
-        printf("here!!!!!\n");
-        if (clusterNum == 0)
-            clusterNum = 2;
     } else {
         clusterNum = directory_location(img_fd, bpb); // Get starting cluster of current directory
     }
@@ -384,21 +358,18 @@ void list_content(int img_fd, bpb_t bpb) {
     char buffer[clusterSize];
     dentry_t *dirEntry;
 
-    // Print '.' and '..' for non-root directories
-    if (strcmp(current_path, "/") != 0) {
-        printf(".\n..\n");
-    }
     bool endOfDirectoryReached = false;
 
     do {
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+        uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+        dataRegionOffset += (clusterNum - 2) * clusterSize;
         ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
             printf("Error reading directory entries.\n");
             return;
         }
-
+        bool entriesPresentInCluster = false;
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
 
@@ -412,7 +383,7 @@ void list_content(int img_fd, bpb_t bpb) {
             if (dirEntry->DIR_Name[0] == 0xE5) {
                 continue;
             }
-
+            entriesPresentInCluster = true;
             // Print directory entry name
             char name[12];
             memcpy(name, dirEntry->DIR_Name, 11);
@@ -427,8 +398,13 @@ void list_content(int img_fd, bpb_t bpb) {
         }
 
         // Get next cluster number from FAT
-        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
         pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
+
+        if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
+            endOfDirectoryReached = endOfDirectoryReached || !entriesPresentInCluster;
+        }
+
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum) && !endOfDirectoryReached);
@@ -501,35 +477,42 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
     char *token;
     char *full_path_copy = strdup(current_path);
+    //printf("full path copy:%s\n", full_path_copy);
     token = strtok(full_path_copy, "/");
     while (token != NULL) {
         bool found = false;
         do {
             // Read the current directory's entries
-            uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+            uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+            dataRegionOffset += (clusterNum - 2) * clusterSize;
             ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
             if (bytesRead <= 0) {
                 free(full_path_copy);
+                printf("error on read\n");
                 return 0;
             }
 
             for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
                 dirEntry = (dentry_t *)(buffer + i);
                 if (dirEntry->DIR_Name[0] == 0x00) { // End of directory entries
+                    printf("end of directory reached\n");
                     found = false;
                     break;
                 }
-                if (strncmp(dirEntry->DIR_Name, token, 11) == 0 && (dirEntry->DIR_Attr & 0x10)) {
-                    found = true;
-                    clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
-                    break;
+                if (strncmp(dirEntry->DIR_Name, token, strlen(token)) == 0 && (dirEntry->DIR_Attr & 0x10)) {
+                    if (dirEntry->DIR_Name[strlen(token)] == 0x00 || dirEntry->DIR_Name[strlen(token)] == 0x20)
+                    {
+                        found = true;
+                        clusterNum = ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+                        break;
+                    }
                 }
             }
 
             if (!found) {
                 // Get next cluster number from FAT
-                uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+                uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
                 pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
                 clusterNum = nextClusterNum;
             }
@@ -537,6 +520,8 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
         if (!found) {
             free(full_path_copy);
+            printf("nothing found, end of file or bad cluster, ...\n");
+            printf("return of is_end_of_file_or_bad_cluster function:%d\n", is_end_of_file_or_bad_cluster(clusterNum));
             return 0;
         }
 
@@ -548,21 +533,13 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 }
 
 bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
-    char upper_dir_name[12];
-    strncpy(upper_dir_name, dir_name, 11);
-    upper_dir_name[11] = '\0'; // Ensure null termination
-    for (int i = 0; upper_dir_name[i] != '\0'; i++) {
-        upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
-    }
-    printf("Upper directory name: %s\n", upper_dir_name);
 
-    if (!is_8_3_format(upper_dir_name)) {
-        printf("%s is not in fat32 8.3 format", dir_name);
+    if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
+        printf("%s is not in fat32 8.3 format\n", dir_name);
         return true; // Return true if not in 8.3 format
     }
 
     uint32_t clusterNum = directory_location(fd_img, bpb);
-    printf("Directory cluster number %u\n", clusterNum);
     uint32_t nextClusterNum;
     uint32_t dirEntrySize = sizeof(dentry_t);
     uint32_t bufferSize = bpb.BPB_BytsPerSec * bpb.BPB_SecPerClus;
@@ -571,54 +548,46 @@ bool is_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     bool found = false;
 
     do {
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
+        uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+        dataRegionOffset += (clusterNum - 2) * bufferSize;
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
-            perror("pread failed");
             printf("data region could not be read\n");
             return true;
         }
 
         for (uint32_t i = 0; i < bytesRead; i += dirEntrySize) {
-            printf("in loop to traverse current cluster\n");
             dirEntry = (dentry_t *)(buffer + i);
 
             // End of directory marker
             if (dirEntry->DIR_Name[0] == 0x00) {
-                printf("no directory with the name %s found", upper_dir_name);
                 return false;
             }
-
             // Skip deleted entries and check for directory name match
-            if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, upper_dir_name, 11) == 0 && 
+            if (dirEntry->DIR_Name[0] != 0xE5 && strncmp(dirEntry->DIR_Name, dir_name, strlen(dir_name)) == 0 && 
                 (dirEntry->DIR_Attr & 0x10)) {
-                printf("directory exists\n");
-                return true;
+                    if (dirEntry->DIR_Name[strlen(dir_name)] == 0x00 || dirEntry->DIR_Name[strlen(dir_name)] == 0x20)
+                    {
+                        printf("directory already exists\n");
+                        return true;
+                    }
             }
         }
-        printf("moving on to next cluster\n");
         // Get next cluster number from FAT
-        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
         pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
         clusterNum = nextClusterNum;
 
     } while (!is_end_of_file_or_bad_cluster(clusterNum));
-    printf("no directory with the name %s found", upper_dir_name);
+    printf("no directory with the name %s found", dir_name);
     return false;
 }
 
 bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
-    char upper_file_name[12];
-    strncpy(upper_file_name, file_name, 11);
-    upper_file_name[11] = '\0'; // Ensure null termination
-    for (int i = 0; upper_file_name[i] != '\0'; i++) {
-        upper_file_name[i] = toupper((unsigned char)upper_file_name[i]);
-    }
 
-    if (!is_8_3_format(upper_file_name)) {
-        printf("%s is not in fat32 8.3 format", file_name);
+    if (!is_8_3_format(file_name)) {
+        printf("%s is not in fat32 8.3 format\n", file_name);
         return true; // Return true if not in 8.3 format
     }
 
@@ -631,11 +600,11 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
     bool found = false;
 
     do {
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * bufferSize;
+        uint32_t dataRegionOffset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+        dataRegionOffset += (clusterNum - 2) * bufferSize;
         ssize_t bytesRead = pread(fd_img, buffer, bufferSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
-            perror("pread failed");
             printf("data region could not be read\n");
             return true;
         }
@@ -647,18 +616,24 @@ bool is_file(int fd_img, bpb_t bpb, const char* file_name) {
             if (dirEntry->DIR_Name[0] == 0x00) {
                 return false;
             }
-
+            //printf("dirEntry->DIR_Name[0] is 0x%X\n", dirEntry->DIR_Name[0]);
+            //printf("dirEntry->DIR_Name is %s\n", dirEntry->DIR_Name);
+            //printf("dirEntry->DIR_Attr is 0x%X\n", dirEntry->DIR_Attr);
+            //printf("dirEntry->DIR_Name[strlen(file_name)] is 0x%X\n", dirEntry->DIR_Name[strlen(file_name)]);
             // Skip deleted entries and check for file name match
             if (dirEntry->DIR_Name[0] != 0xE5 &&
-                strncmp(dirEntry->DIR_Name, file_name, 11) == 0 && 
-                (dirEntry->DIR_Attr & 0x20)) {
-                printf("file exists\n");
-                return true;
+                strncmp(dirEntry->DIR_Name, file_name, strlen(file_name)) == 0 && 
+                ((dirEntry->DIR_Attr == 0x20) || (dirEntry->DIR_Attr == 0x0F))) {
+                    if (dirEntry->DIR_Name[strlen(file_name)] == 0x00 || dirEntry->DIR_Name[strlen(file_name)] == 0x20)
+                    {
+                        printf("file already exists\n");
+                        return true;
+                    }
             }
         }
 
         // Get next cluster number from FAT
-        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum);
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
         pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
         clusterNum = nextClusterNum;
 
@@ -677,32 +652,33 @@ bool is_8_3_format(const char* name) {
             name_len = 0; // Reset length for extension part
         } else {
             name_len++;
-            if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8)) {
-                printf("not in 8.3 format\n");
+            if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8))
                 return false; // Extension or name part too long
-            }
         }
+    }
+    return true;
+}
+
+bool is_8_3_format_directory(const char* name) {
+    for (int i = 0; name[i] != '\0'; i++) {
+        char upper_char = toupper((unsigned char)name[i]);
+
+        // Check if the character is not the same as its uppercase version
+        if (name[i] != upper_char)
+            return false;
     }
     return true;
 }
 
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
     // Check if the directory name is in FAT32 8.3 format
-    if (!is_8_3_format(dir_name)) {
+    if (!is_8_3_format(dir_name) || !is_8_3_format_directory(dir_name)) {
         printf("Directory name is not in FAT32 8.3 format\n");
         return;
     }
 
-    // Convert dir_name to uppercase as FAT32 is case-insensitive
-    char upper_dir_name[12];
-    strncpy(upper_dir_name, dir_name, 11);
-    upper_dir_name[11] = '\0';
-    for (int i = 0; upper_dir_name[i] != '\0'; i++) {
-        upper_dir_name[i] = toupper((unsigned char)upper_dir_name[i]);
-    }
-
     // Allocate a cluster for the new directory
-    uint32_t free_cluster = alloca_cluster(fd_img);
+    uint32_t free_cluster = alloca_cluster(fd_img, bpb);
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new directory\n");
         return;
@@ -710,7 +686,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
 
     // Create a directory entry for the new directory
     dentry_t new_dir_entry = {0};
-    strncpy(new_dir_entry.DIR_Name, upper_dir_name, 11);
+    strncpy(new_dir_entry.DIR_Name, dir_name, 11);
     new_dir_entry.DIR_Attr = 0x10; // Directory attribute
     new_dir_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
     new_dir_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
@@ -724,6 +700,23 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name) {
         parent_dir_cluster = directory_location(fd_img, bpb); // Else get the parent's cluster
     }
     append_dir_entry(fd_img, &new_dir_entry, parent_dir_cluster, bpb);
+
+    dentry_t dot_entry = {0};
+    strncpy(dot_entry.DIR_Name, ".          ", 11); // 11 characters, padded with spaces
+    dot_entry.DIR_Attr = 0x10; // Directory attribute
+    dot_entry.DIR_FstClusHI = (free_cluster >> 16) & 0xFFFF;
+    dot_entry.DIR_FstClusLO = free_cluster & 0xFFFF;
+
+    dentry_t dotdot_entry = {0};
+    strncpy(dotdot_entry.DIR_Name, "..         ", 11); // 11 characters, padded with spaces
+    dotdot_entry.DIR_Attr = 0x10; // Directory attribute
+    uint32_t parent_cluster = (strcmp(current_path, "/") == 0) ? bpb.BPB_RootClus : directory_location(fd_img, bpb);
+    dotdot_entry.DIR_FstClusHI = (parent_cluster >> 16) & 0xFFFF;
+    dotdot_entry.DIR_FstClusLO = parent_cluster & 0xFFFF;
+
+    // Write '.' and '..' entries to the new directory
+    write_dir_entry(fd_img, &dot_entry, convert_clus_num_to_offset_in_data_region(free_cluster, bpb));
+    write_dir_entry(fd_img, &dotdot_entry, convert_clus_num_to_offset_in_data_region(free_cluster, bpb) + sizeof(dentry_t));
 }
 
 void new_file(int fd_img, bpb_t bpb, const char* file_name) {
@@ -731,7 +724,7 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
     // Assuming a function that does this conversion
 
     // Allocate a cluster for the new file
-    uint32_t free_cluster = alloca_cluster(fd_img);
+    uint32_t free_cluster = alloca_cluster(fd_img, bpb);
     if (free_cluster == 0) {
         printf("Failed to allocate a cluster for the new file\n");
         return;
@@ -753,9 +746,7 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
     ssize_t wr_bytes = pwrite(fd, dentry, sizeof(dentry_t), offset);
     if (wr_bytes != sizeof(dentry_t)) {
-        perror("Error writing directory entry"); // Print the system error message
-        printf("Failed to write directory entry at offset: %u\n", offset);
-        printf("Bytes attempted to write: %zu, Bytes written: %zd\n", sizeof(dentry_t), wr_bytes);
+        perror("Error writing directory entry");
     }
 }
 
@@ -766,7 +757,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
     uint32_t bytesProcessed = 0;
     while (curr_clus_num != 0xFFFFFFFF) {
-        uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num);
+        uint32_t data_offset = convert_clus_num_to_offset_in_data_region(curr_clus_num, bpb);
 
         while (bytesProcessed < clusterSize) {
             dentry_t dentry;
@@ -780,10 +771,8 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
-                    printf("Appending directory entry. Cluster number: %u, Sector size: %u, Cluster size: %u\n", curr_clus_num, sectorSize, clusterSize);
                     return;  // Add return here to exit the function if write fails
                 }
-                printf("Successfully wrote directory entry\n");
                 return;
             }
 
@@ -791,11 +780,11 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
         }
         // Reset for the next cluster
         bytesProcessed = 0;
-        uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num);
+        uint32_t fat_offset = convert_clus_num_to_offset_in_fat_region(curr_clus_num, bpb);
         pread(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
 
         if (next_clus_num == 0xFFFFFFFF) {
-            next_clus_num = alloca_cluster(fd);
+            next_clus_num = alloca_cluster(fd, bpb);
             pwrite(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
             curr_clus_num = next_clus_num;
         } else {
@@ -830,30 +819,6 @@ void print_boot_sector_info(bpb_t bpb) {
     printf("Size of Image (in bytes): %u\n", imageSize);
 }
 
-// Revised function to read and process directory entries
-void process_directory_entries(int fat32_fd, uint32_t cluster_num, bpb_t bpb) {
-    uint32_t sectorSize = bpb.BPB_BytsPerSec;
-    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
-    uint32_t dataRegionOffset = ((cluster_num - 2) * clusterSize) +
-                                (bpb.BPB_NumFATs * bpb.BPB_FATSz32 * sectorSize) +
-                                (bpb.BPB_RsvdSecCnt * sectorSize);
-
-    for (uint32_t i = 0; i < clusterSize; i += sizeof(dentry_t)) {
-        dentry_t dentry;
-        ssize_t rd_bytes = pread(fat32_fd, &dentry, sizeof(dentry_t), dataRegionOffset + i);
-
-        if (rd_bytes != sizeof(dentry_t)) {
-		//Handle error
-		break;
-	}
-
-	//Check if the entry is a valid file or directory
-	if ((dentry.DIR_Attr & 0x10) == 0x10 || (dentry.DIR_Attr & 0x20) == 0x20) {
-            dbg_print_dentry(&dentry);
-        }
-    }
-}
-
 //mounts the fat23 image file
 bpb_t mount_fat32(int img_fd) {
     bpb_t bpb;
@@ -863,48 +828,57 @@ bpb_t mount_fat32(int img_fd) {
         close(img_fd);
         exit(EXIT_FAILURE);
     }
-    // check if rd_bytes == sizeof(BPB_BytsPerSec)
+
     if (rd_bytes != sizeof(bpb_t)) {
         printf("request %zu bytes, but read %zu bytes\n", sizeof(bpb_t), rd_bytes);
         close(img_fd);
         exit(EXIT_FAILURE);
     }
-    printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
-    printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
-    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
-    bpb.BPB_RootClus = 2;
-    printf("Root Cluster Number: %u\n", bpb.BPB_RootClus);
-    printf("Fat size: %u\n", bpb.BPB_FATSz32);
-    bpb.BPB_FATSz32 = 1009;
-    printf("Fat size: %u\n", bpb.BPB_FATSz32);
+    printf("               INITIAL VALUES:\n");
+    printf("===============================================\n");
+    printf("BS_jmpBoot is %.3s\n", bpb.BS_jmpBoot);
+    printf("BS_OEMName is %.8s\n", bpb.BS_OEMName);
+    printf("BPB_BytsPerSec is %u\n", bpb.BPB_BytsPerSec);
+    printf("BPB_SecPerClus is %u\n", bpb.BPB_SecPerClus);
+    printf("BPB_RsvdSecCnt is %u\n", bpb.BPB_RsvdSecCnt);
+    printf("BPB_NumFATs is %u\n", bpb.BPB_NumFATs);
+    printf("BPB_RootEntCnt is %u\n", bpb.BPB_RootEntCnt);
+    printf("BPB_TotSec16 is %u\n", bpb.BPB_TotSec16);
+    printf("BPB_Media is %u\n", bpb.BPB_Media);
+    printf("BPB_FATSz32 is %u\n", bpb.BPB_FATSz32);
+    printf("BPB_SecPerTrk is %u\n", bpb.BPB_SecPerTrk);
+    printf("BPB_NumHeads is %u\n", bpb.BPB_NumHeads);
+    printf("BPB_HiddSec is %u\n", bpb.BPB_HiddSec);
+    printf("BPB_TotSec32 is %u\n", bpb.BPB_TotSec32);
+    printf("BPB_RootClus is %u\n", bpb.BPB_RootClus);
+    printf("===============================================\n");
 
     return bpb;
 }
 
-uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset) {
-    uint32_t fat_region_offset = 0x4000;
+uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset, bpb_t bpb) {
+    uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
     return (offset - fat_region_offset)/4;
 }
 
-uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num) {
-    uint32_t fat_region_offset = 0x4000;
+uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb) {
+    uint32_t fat_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt;
     return fat_region_offset + clus_num * 4;
 }
 
-uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num) {
-    uint32_t clus_size = 512;
-    uint32_t data_region_offset = 0x100400;
-    return data_region_offset + (clus_num - 2) * clus_size;
+uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb) {
+    uint32_t data_region_offset = bpb.BPB_BytsPerSec * bpb.BPB_RsvdSecCnt + bpb.BPB_NumFATs * bpb.BPB_FATSz32 * bpb.BPB_BytsPerSec;
+    return data_region_offset + (clus_num - 2) * bpb.BPB_BytsPerSec;
 }
 
-uint32_t alloca_cluster(int fd) {
+uint32_t alloca_cluster(int fd, bpb_t bpb) {
     uint32_t min_clus_num = 2;
-    uint32_t max_clus_num = 1009;
+    uint32_t max_clus_num = bpb.BPB_FATSz32;
     uint32_t clus_clus_num = min_clus_num;
     uint32_t next_clus_num;
     
     while (clus_clus_num <= max_clus_num) {
-        uint32_t offset = convert_clus_num_to_offset_in_fat_region(clus_clus_num);
+        uint32_t offset = convert_clus_num_to_offset_in_fat_region(clus_clus_num, bpb);
         ssize_t bytes_read = pread(fd, &next_clus_num, sizeof(uint32_t), offset);
 
         // Check if pread was successful
@@ -935,9 +909,9 @@ uint32_t alloca_cluster(int fd) {
 }
 
 
-void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr) {
+void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb) {
     // Allocate a new cluster
-    uint32_t new_clus_num = alloca_cluster(fd);
+    uint32_t new_clus_num = alloca_cluster(fd, bpb);
     if (new_clus_num == 0) {
         // Handle the error: No free cluster available
         return;
@@ -951,16 +925,16 @@ void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dent
 
         // Write the updated directory entry back to the disk
         // Assuming a function write_dentry() that writes the directory entry at the correct location
-        uint32_t offset = convert_clus_num_to_offset_in_data_region(*current_clus_num_ptr);
+        uint32_t offset = convert_clus_num_to_offset_in_data_region(*current_clus_num_ptr, bpb);
         write_dir_entry(fd, dentry_ptr, offset);
     } else {
         // The file or directory already has clusters. Extend the chain.
         uint32_t final_clus_num = *current_clus_num_ptr;
-        uint32_t final_offset = convert_clus_num_to_offset_in_fat_region(final_clus_num);
+        uint32_t final_offset = convert_clus_num_to_offset_in_fat_region(final_clus_num, bpb);
         pwrite(fd, &new_clus_num, sizeof(uint32_t), final_offset);
 
         // Mark the new cluster as the end of the chain
-        uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num);
+        uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num, bpb);
         uint32_t end_of_file = 0xFFFFFFFF;
         pwrite(fd, &end_of_file, sizeof(uint32_t), new_offset);
     }
