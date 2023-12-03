@@ -256,7 +256,6 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name) {
     uint32_t dir_cluster = directory_location(img_fd, bpb);
 
     if (dir_cluster == 0) {
-        printf("Directory %s not found.\n", dir_name);
         return;
     }
 
@@ -317,7 +316,6 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
 
     uint32_t dir_cluster = directory_location(img_fd, bpb);
     if (dir_cluster == 0) {
-        printf("Error: Directory not found.\n");
         return;
     }
 
@@ -385,7 +383,6 @@ void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
 
     uint32_t dir_cluster = directory_location(img_fd, bpb);
     if (dir_cluster == 0) {
-        printf("Error: Directory not found.\n");
         return;
     }
 
@@ -645,8 +642,6 @@ uint32_t directory_location(int fd_img, bpb_t bpb) {
 
         if (!found) {
             free(full_path_copy);
-            printf("nothing found, end of file or bad cluster, ...\n");
-            printf("return of is_end_of_file_or_bad_cluster function:%d\n", is_end_of_file_or_bad_cluster(clusterNum));
             return 0;
         }
 
