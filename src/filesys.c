@@ -838,12 +838,22 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             }
 
             if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == (char)0xE5) {
+                // Write the new directory entry
                 ssize_t wr_bytes = pwrite(fd, new_dentry, sizeof(dentry_t), data_offset + bytesProcessed);
                 if (wr_bytes != sizeof(dentry_t)) {
                     printf("Failed to write directory entry\n");
                     return;
                 }
-                return; // Entry written, exit function
+
+                // Write the end-of-directory marker after the new entry
+                dentry_t end_of_dir_entry = {0};
+                end_of_dir_entry.DIR_Name[0] = 0x00;
+                wr_bytes = pwrite(fd, &end_of_dir_entry, sizeof(dentry_t), data_offset + bytesProcessed + sizeof(dentry_t));
+                if (wr_bytes != sizeof(dentry_t)) {
+                    printf("Failed to write end-of-directory marker\n");
+                    return;
+                }
+                return;
             }
         }
 
@@ -861,12 +871,21 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
             }
             pwrite(fd, &new_clus_num, sizeof(uint32_t), fat_offset); // Link the new cluster
             curr_clus_num = new_clus_num;
+
+            // Initialize the new cluster with an end-of-directory marker
+            dentry_t end_of_dir_entry = {0};
+            end_of_dir_entry.DIR_Name[0] = 0x00;
+            uint32_t new_cluster_offset = convert_clus_num_to_offset_in_data_region(new_clus_num, bpb);
+            ssize_t wr_bytes = pwrite(fd, &end_of_dir_entry, sizeof(dentry_t), new_cluster_offset);
+            if (wr_bytes != sizeof(dentry_t)) {
+                printf("Failed to initialize new cluster with end-of-directory marker\n");
+                return;
+            }
         } else {
             curr_clus_num = next_clus_num; // Move to next cluster in the chain
         }
     }
 }
-
 
 void dbg_print_dentry(dentry_t *dentry) {
     if (dentry == NULL) {
