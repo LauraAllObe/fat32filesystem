@@ -131,7 +131,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             printf("mkdir command requires an argument, none was given.\n");
         else if (strcmp(tokens->items[0], "mkdir") == 0)
         {
-            int value = is_directory(img_fd, bpb, tokens->items[2]);
+            int value = is_directory(img_fd, bpb, tokens->items[1]);
             if(strcmp(tokens->items[1], ".") == 0 || strcmp(tokens->items[1], "..") == 0)
                 printf("users can not make . or .. directories.\n");
             else if(value == 0)
@@ -175,7 +175,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
                 if(value == 1)
                     remove_directories(img_fd, bpb, tokens->items[2]);
                 else if(value == 0)
-                    printf("Directory named %s does not exist in the current directory.\n", tokens->items[1]);
+                    printf("Directory named %s does not exist in the current directory.\n", tokens->items[2]);
                 else if(value == -1)
                     printf("data region could not be read\n");
                 else if(value == -2)
