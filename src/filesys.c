@@ -758,31 +758,23 @@ int is_file(int fd_img, bpb_t bpb, const char* file_name) {
 }
 
 bool is_8_3_format(const char* name) {
-    int name_len = 0;
-    bool dot_encountered = false;
-
-    for (int i = 0; name[i] != '\0'; i++) {
-        if (name[i] == '.') {
-            if (dot_encountered || i > 8) return false; // More than one dot or name part too long
-            dot_encountered = true;
-            name_len = 0; // Reset length for extension part
-        } else {
-            name_len++;
-            if ((dot_encountered && name_len > 3) || (!dot_encountered && name_len > 8))
-                return false; // Extension or name part too long
-        }
-    }
-    return true;
+    // Check if the name is not longer than 11 characters
+    return strlen(name) <= 11;
 }
 
 bool is_8_3_format_directory(const char* name) {
-    for (int i = 0; name[i] != '\0'; i++) {
-        char upper_char = toupper((unsigned char)name[i]);
-
-        // Check if the character is not the same as its uppercase version
-        if (name[i] != upper_char)
-            return false;
+    // Check if the directory name is not longer than 11 characters
+    if (strlen(name) > 11) {
+        return false;
     }
+
+    // Check if all characters are uppercase
+    for (int i = 0; name[i] != '\0'; i++) {
+        if (!isupper((unsigned char)name[i])) {
+            return false;
+        }
+    }
+
     return true;
 }
 
