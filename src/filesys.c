@@ -762,9 +762,10 @@ bool is_8_3_format_directory(const char* name) {
         return false;
     }
 
-    // Check if all characters are uppercase
+    // Check if all characters are uppercase, digits, or special 8.3 characters
     for (int i = 0; name[i] != '\0'; i++) {
-        if (!isupper((unsigned char)name[i])) {
+        if (!(isupper((unsigned char)name[i]) || isdigit((unsigned char)name[i]) ||
+              name[i] == ' ' || name[i] == '.' || name[i] == '_' || name[i] == '~')) {
             return false;
         }
     }
