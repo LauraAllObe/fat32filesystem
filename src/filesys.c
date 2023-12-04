@@ -74,6 +74,10 @@ bool is_8_3_format(const char* name);
 bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
+void append_to_file(int img_fd, bpb_t bpb, const char* file_name, const char* data);
+dentry_t* find_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, const char* file_name);
+uint32_t find_last_cluster(int img_fd, bpb_t bpb, uint32_t first_cluster);
+void write_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, dentry_t* dirEntry) ;
 void list_content(int img_fd, bpb_t bpb);
 void remove_file(int img_fd, bpb_t bpb, const char* file_name);
 void remove_directories(int img_fd, bpb_t bpb, const char* dir_name);
@@ -860,6 +864,182 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
     // Find the location of the current directory and append the new file entry
     uint32_t current_dir_cluster = directory_location(fd_img, bpb);
     append_dir_entry(fd_img, &new_file_entry, current_dir_cluster, bpb);
+}
+
+void append_to_file(int img_fd, bpb_t bpb, const char* file_name, const char* data)
+{
+	// Find the file in the directory
+	uint32_t dir_cluster = directory_location(img_fd, bpb);
+	dentry_t *dirEntry = find_directory_entry(img_fd, bpb, dir_cluster, file_name);
+
+	if (dirEntry == NULL)
+	{
+		printf("File not found: %s\n", file_name);
+		return;
+	}
+
+	// Check if the entry is a file
+	if (!(dirEntry->DIR_Attr & 0x10))
+	{
+		// File found, continue with append operation
+		uint32_t last_cluster = find_last_cluster(img_fd, bpb, dirEntry->DIR_FstClusLO);
+		uint32_t cluster_offset = convert_clus_num_to_offset_in_data_region(last_cluster, bpb);
+
+		// Calculate the size of the data to append
+		size_t data_size = strlen(data);
+
+		// Append data to the end of the file
+		if (pwrite(img_fd, data, data_size, cluster_offset + dirEntry->DIR_FileSize) == -1) {
+		perror("Error writing data to file");
+		return;
+		}
+
+		// Update file size in the directory entry
+		dirEntry->DIR_FileSize += data_size;
+
+		// Save changes to the FAT32 image
+		write_directory_entry(img_fd, bpb, dir_cluster, dirEntry);
+	} else
+	{
+		printf("%s is a directory, not a file.\n", file_name);
+	}
+}
+
+dentry_t* find_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, const char* file_name)
+{
+	uint32_t sectorSize = bpb.BPB_BytsPerSec;
+	uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+	char buffer[clusterSize];
+	dentry_t *dirEntry;
+
+	// Iterate over directory entries
+	while (!is_end_of_file_or_bad_cluster(dir_cluster)) 
+	{
+		uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+		ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+
+		if (bytesRead <= 0)
+		{
+			printf("Error reading directory entries.\n");
+			return NULL;
+		}
+
+		for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t))
+		{
+			dirEntry = (dentry_t *)(buffer + i);
+
+			if (dirEntry->DIR_Name[0] == (char)0x00)
+			{
+		 		 return NULL; // End of directory entries
+			}
+
+			if (dirEntry->DIR_Name[0] == (char)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0) 
+			{
+				continue; // Skip deleted entries and '.'/'..' entries
+			}
+
+			// Construct full entry name
+			char entryName[12];
+			memcpy(entryName, dirEntry->DIR_Name, 11);
+			entryName[11] = '\0';
+
+			// Check if the entry matches the file name
+			if (strcmp(entryName, file_name) == 0)
+			{
+				return dirEntry; // Found the directory entry
+			}
+		}
+
+		// Get next cluster number from FAT
+		uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+		pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+	}
+
+	return NULL; // File not found
+}
+
+uint32_t find_last_cluster(int img_fd, bpb_t bpb, uint32_t first_cluster) 
+{
+	uint32_t current_cluster = first_cluster;
+	uint32_t next_cluster;
+
+	// Traverse the cluster chain
+	while (!is_end_of_file_or_bad_cluster(current_cluster)) 
+	{
+		uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(current_cluster, bpb);
+		pread(img_fd, &next_cluster, sizeof(uint32_t), fatOffset);
+
+		if (is_end_of_file_or_bad_cluster(next_cluster)) 
+		{
+			return current_cluster; // Last cluster found
+		}
+
+		current_cluster = next_cluster;
+	}
+
+	return current_cluster;
+}
+
+void write_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, dentry_t* dirEntry) 
+{
+	uint32_t sectorSize = bpb.BPB_BytsPerSec;
+	uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+	uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+	uint32_t cluster_offset = 0;
+
+	char buffer[clusterSize];
+	dentry_t *currentDirEntry;
+
+	// Iterate over directory entries
+	while (!is_end_of_file_or_bad_cluster(dir_cluster)) 
+	{
+		ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+		
+		if (bytesRead <= 0) 
+		{
+			perror("Error reading directory entries");
+			return;
+		}
+
+		for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) 
+		{
+			currentDirEntry = (dentry_t *)(buffer + i);
+	
+			if (currentDirEntry->DIR_Name[0] == (char)0x00) 
+			{
+				return; // End of directory entries
+			}
+
+			if (currentDirEntry->DIR_Name[0] == (char)0xE5 || strcmp(currentDirEntry->DIR_Name, ".") == 0 || strcmp(currentDirEntry->DIR_Name, "..") == 0) 
+			{
+				continue; // Skip deleted entries and '.'/'..' entries
+			}
+
+			// Construct full entry name
+			char entryName[12];
+			memcpy(entryName, currentDirEntry->DIR_Name, 11);
+			entryName[11] = '\0';
+
+			// Check if the entry matches the target directory name
+			if (strcmp(entryName, dirEntry->DIR_Name) == 0) 
+			{
+				// Update the directory entry
+				memcpy(buffer + i, dirEntry, sizeof(dentry_t));
+
+				// Write the updated buffer back to the image
+				pwrite(img_fd, buffer, bytesRead, dataRegionOffset + cluster_offset);
+
+				return;
+			}
+		}
+
+		// Get next cluster number from FAT
+		uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+		pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+		cluster_offset += bytesRead;
+	}
+
+	perror("Directory entry not found for writing");
 }
 
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
