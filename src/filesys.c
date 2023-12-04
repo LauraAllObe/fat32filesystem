@@ -160,6 +160,35 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else
                 printf("file exists\n");
         }
+        else if (strcmp(tokens->items[0], "open") == 0) {
+        if (tokens->size != 3) {
+            printf("open command requires exactly two arguments: filename and mode\n");
+        } else {
+            const char* filename = tokens->items[1];
+            const char* mode = tokens->items[2];
+            open_file(filename, mode);
+        }
+        }
+        else if (strcmp(tokens->items[0], "close") == 0) {
+            if (tokens->size != 2) {
+                printf("close command requires exactly one argument: filename\n");
+            } else {
+                const char* filename = tokens->items[1];
+                close_file(filename);
+            }
+        }
+        else if (strcmp(tokens->items[0], "lsof") == 0) {
+            list_open_files();
+        }
+        else if (strcmp(tokens->items[0], "lseek") == 0) {
+            if (tokens->size != 3) {
+                printf("lseek command requires exactly two arguments: filename and offset\n");
+            } else {
+                const char* filename = tokens->items[1];
+                uint32_t offset = atoi(tokens->items[2]);
+                seek_file(filename, offset);
+            }
+        }
         else if(strcmp(tokens->items[0], "read") == 0) 
         { //else if to integrate read functionality
             if(tokens->size != 3) {
