@@ -911,7 +911,11 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
         uint32_t next_clus_num;
         pread(fd, &next_clus_num, sizeof(uint32_t), fat_offset);
 
-        if (next_clus_num == 0xFFFFFFFF) {
+        uint32_t fat32_bad_cluster_min = 0xFFFFFF8;
+        uint32_t fat32_bad_cluster_max = 0xFFFFFFFF;
+
+        // Check if the cluster number falls within the range of bad clusters or is the end of the file.
+        if ((next_clus_num >= fat32_bad_cluster_min && next_clus_num <= fat32_bad_cluster_max)) {
             // Allocate a new cluster and link it
             uint32_t new_clus_num = alloca_cluster(fd, bpb);
             if (new_clus_num == 0) {
