@@ -884,6 +884,7 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
                 printf("Failed to read directory entry\n");
                 return;
             }
+            printf("Line 887: %s\n", dentry.DIR_Name);
 
             if (dentry.DIR_Name[0] == 0x00 || dentry.DIR_Name[0] == (char)0xE5) {
                 // Write the new directory entry
