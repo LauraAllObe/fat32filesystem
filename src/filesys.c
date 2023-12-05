@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 
+//stores fat32 filesystem data
 typedef struct __attribute__((packed)) BPB {
     char BS_jmpBoot[3];
     char BS_OEMName[8];
@@ -30,7 +31,7 @@ typedef struct __attribute__((packed)) BPB {
     char BPB_Reserved[12];
 } bpb_t;
 
-
+//temporarily stores directory entries (info on files/directories)
 typedef struct __attribute__((packed)) directory_entry {
     char DIR_Name[11];
     uint8_t DIR_Attr;
@@ -41,52 +42,61 @@ typedef struct __attribute__((packed)) directory_entry {
     uint32_t DIR_FileSize;
 } dentry_t;
 
-
+//stores tokens
 typedef struct {
     char ** items;
     size_t size;
 } tokenlist;
 
+//token functionality (from project 1)
 char * get_input(void);
 tokenlist * get_tokens(char *input);
 tokenlist * new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
+//info command function (prints info on bpb)
 void print_boot_sector_info(bpb_t bpb);
-void dbg_print_dentry(dentry_t *dentry);
+//mounts the fat32 filesystem
 bpb_t mount_fat32(int img_fd);
+//checks for end of file or bad cluster (used during cluster traversal)
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num);
+//conversion functions
 uint32_t convert_clus_num_to_offset_in_fat_region(uint32_t clus_num, bpb_t bpb);
 uint32_t convert_offset_to_clus_num_in_fat_region(uint32_t offset, bpb_t bpb);
 uint32_t convert_clus_num_to_offset_in_data_region(uint32_t clus_num, bpb_t bpb);
+//write's the directory entry
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset);
+//append (and write) the directory entry to end of cluster
 void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb);
+//allocate a new cluster
 uint32_t alloca_cluster(int fd, bpb_t bpb);
+//resets cluster data to zeroes
 void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb);
-void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb);
 bool is_valid_path(int fd_img, bpb_t bpb, const char* path);
 uint32_t directory_location(int fd_img, bpb_t bpb);
 //return values: 0 == false, 1 == true, -1 == error on read, -2 == name format error
 int is_directory(int fd_img, bpb_t bpb, const char* dir_name);
 //return values: 0 == false, 1 == true, -1 == error on read, -2 == name format error
 int is_file(int fd_img, bpb_t bpb, const char* file_name);
+//checks if is max 11 characters long
 bool is_8_3_format(const char* name);
+//checks if is max 11 characters long and uppercase letters
 bool is_8_3_format_directory(const char* name);
+//creates a new directory
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
+//creates a new file
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
+//lists content of the current directory
 void list_content(int img_fd, bpb_t bpb);
+//removes a file (if not already open)
 void remove_file(int img_fd, bpb_t bpb, const char* file_name);
+//removes directory content's recusrively(calls remove_file and remove_directory)
 void remove_directories(int img_fd, bpb_t bpb, const char* dir_name);
+//removes a directory
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name);
-//ADD FUNCTION DECLARATIONS HERE
 
-// other data structure, global variables, etc. define them in need.
-// e.g., 
-// the opened fat32.img file
 // the current working directory
-char current_path[256] = "/";//UPDATE ON cd
-// the opened files
-// other data structures and global variables you need
+char current_path[256] = "/";
 
 //main function (loops) (all the functionality is called or written here)
 void main_process(int img_fd, const char* img_path, bpb_t bpb) {
@@ -940,20 +950,6 @@ void append_dir_entry(int fd, dentry_t *new_dentry, uint32_t clus_num, bpb_t bpb
     }
 }
 
-void dbg_print_dentry(dentry_t *dentry) {
-    if (dentry == NULL) {
-        return;
-    }
-
-    // Combine DIR_FstClusHI and DIR_FstClusLO to get the correct cluster number
-    uint32_t firstCluster = ((uint32_t)dentry->DIR_FstClusHI << 16) | (uint32_t)dentry->DIR_FstClusLO;
-
-    printf("DIR_Name: %s\n", dentry->DIR_Name);
-    printf("DIR_Attr: 0x%x\n", dentry->DIR_Attr);
-    printf("First Cluster Number: %u\n", firstCluster);
-    printf("DIR_FileSize: %u\n", dentry->DIR_FileSize);
-}
-
 void print_boot_sector_info(bpb_t bpb) {
     printf("Bytes Per Sector: %u\n", bpb.BPB_BytsPerSec);
     printf("Sectors Per Cluster: %u\n", bpb.BPB_SecPerClus);
@@ -1085,44 +1081,6 @@ uint32_t alloca_cluster(int fd, bpb_t bpb) {
 
     printf("No free cluster found\n");
     return 0; // No free cluster found
-}
-
-
-void extend_cluster_chain(int fd, uint32_t *current_clus_num_ptr, dentry_t *dentry_ptr, bpb_t bpb) {
-    // Allocate a new cluster
-    uint32_t new_clus_num = alloca_cluster(fd, bpb);
-    if (new_clus_num == 0) {
-        // Handle the error: No free cluster available
-        return;
-    }
-
-    if (*current_clus_num_ptr == 0) {
-        // The file or directory has no clusters yet. Set the first cluster.
-        *current_clus_num_ptr = new_clus_num;
-        dentry_ptr->DIR_FstClusHI = (new_clus_num >> 16) & 0xFFFF;
-        dentry_ptr->DIR_FstClusLO = new_clus_num & 0xFFFF;
-
-        // Write the updated directory entry back to the disk
-        // Assuming a function write_dentry() that writes the directory entry at the correct location
-        uint32_t offset = convert_clus_num_to_offset_in_data_region(*current_clus_num_ptr, bpb);
-        write_dir_entry(fd, dentry_ptr, offset);
-    } else {
-        // The file or directory already has clusters. Extend the chain.
-        uint32_t final_clus_num = *current_clus_num_ptr;
-        uint32_t final_offset = convert_clus_num_to_offset_in_fat_region(final_clus_num, bpb);
-        pwrite(fd, &new_clus_num, sizeof(uint32_t), final_offset);
-
-        // Mark the new cluster as the end of the chain
-        uint32_t new_offset = convert_clus_num_to_offset_in_fat_region(new_clus_num, bpb);
-        uint32_t end_of_file = 0xFFFFFFFF;
-        if (pwrite(fd, &end_of_file, sizeof(uint32_t), new_offset) != sizeof(uint32_t)) {
-            perror("Error writing end of file marker in FAT");
-            return;
-        }
-
-        // Update the current cluster pointer
-        *current_clus_num_ptr = new_clus_num;
-    }
 }
 
 bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
