@@ -88,6 +88,12 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 //lists content of the current directory
 void list_content(int img_fd, bpb_t bpb);
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename);
+void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb);
+void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb);
+void close_file(const char* filename);
+void list_open_files();
+void seek_file(const char* filename, uint32_t offset);
 //removes a file (if not already open)
 void remove_file(int img_fd, bpb_t bpb, const char* file_name);
 //removes directory content's recusrively(calls remove_file and remove_directory)
@@ -96,7 +102,20 @@ void remove_directories(int img_fd, bpb_t bpb, const char* dir_name);
 void remove_directory(int img_fd, bpb_t bpb, const char* dir_name);
 
 // the current working directory
+
+//PART 4
+typedef struct {
+    char filename[11];  // 11 characters (8 for name, 3 for extension)
+    char mode[3];       // Store "-r", "-w", "-rw", or "-wr"
+    uint32_t offset;    // Offset in the file
+} OpenFile;
+
+#define MAX_OPEN_FILES 10  // Maximum number of open files at a time
+
+OpenFile openFiles[MAX_OPEN_FILES];  // Global array for open files
+
 char current_path[256] = "/";
+
 
 //main function (loops) (all the functionality is called or written here)
 void main_process(int img_fd, const char* img_path, bpb_t bpb) {
@@ -171,6 +190,48 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
+        else if (strcmp(tokens->items[0], "open") == 0) {
+            if (tokens->size != 3) {
+                printf("open command requires exactly two arguments: filename and mode\n");
+            } else {
+                const char* filename = tokens->items[1];
+                const char* mode = tokens->items[2];
+                open_file(filename, mode, img_fd, bpb);
+            }
+        }
+         else if (strcmp(tokens->items[0], "close") == 0) {
+            if (tokens->size != 2) {
+                printf("close command requires exactly one argument: filename\n");
+            } else {
+                const char* filename = tokens->items[1];
+                close_file(filename);
+            }
+        }
+         else if (strcmp(tokens->items[0], "lsof") == 0) {
+            list_open_files();
+        }
+        else if (strcmp(tokens->items[0], "lseek") == 0) {
+            if (tokens->size != 3) {
+                printf("lseek command requires exactly two arguments: filename and offset\n");
+            } else {
+                const char* filename = tokens->items[1];
+                uint32_t offset = atoi(tokens->items[2]);
+                seek_file(filename, offset);
+            }
+        }
+        else if(strcmp(tokens->items[0], "read") == 0) {
+            if(tokens->size != 3) {
+                printf("read command requires exactly two arguments: filename and size\n");
+            } else {
+                const char* filename = tokens->items[1];
+                uint32_t size = atoi(tokens->items[2]);
+                if(size > 0) {
+                    read_file(filename, size, img_fd, bpb);
+                } else {
+                    printf("Invalid size for read command\n");
+                }
+            }
+        }
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size > 3)
             printf("rm command does not take more than three arguments\n");
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size < 2)
@@ -208,8 +269,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
         {
             printf("command does not exist.\n");
         }
-        // else if cmd is ...
-        // ...
+
         
         free_tokens(tokens);
     }
@@ -1098,6 +1158,224 @@ bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
     }
 
     return false;
+}
+
+// Function definitions for part 4
+// OPEN FILE
+void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
+    // Check if the file is already open
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, filename) == 0) {
+            printf("Error: File '%s' is already open.\n", filename);
+            return;
+        }
+    }
+
+    // Check if the file exists in the file system
+    uint32_t fileCluster = find_file_cluster(img_fd, bpb, filename);
+    if (fileCluster == 0) {
+        printf("Error: File '%s' does not exist.\n", filename);
+        return;
+    }
+
+    // Find an empty slot in openFiles
+    int emptyIndex = -1;
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strlen(openFiles[i].filename) == 0) { // Assuming an empty filename indicates an unused slot
+            emptyIndex = i;
+            break;
+        }
+    }
+
+    // If no empty slot, return an error
+    if (emptyIndex == -1) {
+        printf("Error: Maximum open file limit reached.\n");
+        return;
+    }
+
+    // Check for valid mode and initialize new open file entry
+    if (strcmp(mode, "-r") == 0 || strcmp(mode, "-w") == 0 || strcmp(mode, "-rw") == 0 || strcmp(mode, "-wr") == 0) {
+        strcpy(openFiles[emptyIndex].filename, filename);
+        strcpy(openFiles[emptyIndex].mode, mode);
+        openFiles[emptyIndex].offset = 0;
+    } else {
+        printf("Error: Invalid mode '%s'.\n", mode);
+    }
+}
+
+// CLOSE FILE
+void close_file(const char* filename) {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, filename) == 0) {
+            openFiles[i].filename[0] = '\0'; // Clear the filename to indicate the slot is now empty
+            printf("File '%s' closed successfully.\n", filename);
+            return;
+        }
+    }
+    printf("Error: File '%s' is not open.\n", filename);
+}
+
+// LIST OPEN FILES
+void list_open_files() {
+    bool found = false;
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strlen(openFiles[i].filename) > 0) {
+            printf("File: %s, Mode: %s, Offset: %u\n", openFiles[i].filename, 
+                    openFiles[i].mode, openFiles[i].offset);
+            found = true;
+        }
+    }
+
+    if (!found) {
+        printf("No files are currently open.\n");
+    }
+}
+
+// SEEK FILE
+void seek_file(const char* filename, uint32_t offset) {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, filename) == 0) {
+            // You may need additional logic here to check if the offset is valid (i.e., within the file size)
+            openFiles[i].offset = offset;
+            printf("Offset of file '%s' set to %u.\n", filename, offset);
+            return;
+        }
+    }
+
+    printf("Error: File '%s' is not open.\n", filename);
+}
+
+
+// Find the starting cluster of the file (part 4)
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
+    uint32_t dir_cluster = directory_location(fd_img, bpb);
+    if (dir_cluster == 0) {
+        return 0;
+    }
+
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
+
+    while (dir_cluster != 0xFFFFFFFF) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
+
+        if (bytesRead <= 0) {
+            return 0; // Error or end of directory
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+
+            if (dirEntry->DIR_Name[0] == (char)0x00) return 0; // End of directory entries
+            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
+
+            if (strncmp(dirEntry->DIR_Name, filename, strlen(filename)) == 0 
+                && (dirEntry->DIR_Name[strlen(filename)] == (char)0x00 || dirEntry->DIR_Name[strlen(filename)] == (char)0x20)) {
+                // Check if entry is a file (and not a directory)
+                if (!(dirEntry->DIR_Attr & 0x10)) {
+                    return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+                }
+            }
+        }
+
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+        if (pread(fd_img, &dir_cluster, sizeof(uint32_t), fatOffset) == -1) {
+            return 0; // Error reading from FAT
+        }
+    }
+
+    return 0; // File not found
+}
+
+// READ function implementation (PART 4)
+void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
+    // Check if file is open and in read mode
+    bool fileIsOpen = false;
+    int fileIndex = -1;
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, filename) == 0) {
+            fileIsOpen = true;
+            fileIndex = i;
+            break;
+        }
+    }
+
+    if (!fileIsOpen) {
+        printf("Error: File '%s' is not open.\n", filename);
+        return;
+    }
+
+    if (strstr(openFiles[fileIndex].mode, "r") == NULL) {
+        printf("Error: File '%s' is not opened in read mode.\n", filename);
+        return;
+    }
+
+    // Calculate the starting cluster of the file
+    uint32_t startCluster = find_file_cluster(img_fd, bpb, filename);
+    if (startCluster == 0) {
+        printf("File '%s' not found in current directory.\n", filename);
+        return;
+    }
+
+    // Buffer to store read data
+    char *buffer = malloc(size);
+    if (buffer == NULL) {
+        printf("Error: Memory allocation failed.\n");
+        return;
+    }
+
+    // Calculate which cluster the logical offset corresponds to
+    uint32_t clusterSize = bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec;
+    uint32_t logicalOffset = openFiles[fileIndex].offset;
+    uint32_t clusterOffset = logicalOffset / clusterSize;
+    uint32_t intraClusterOffset = logicalOffset % clusterSize;
+
+    // Follow the cluster chain to find the correct cluster
+    uint32_t currentCluster = startCluster;
+    for (uint32_t i = 0; i < clusterOffset; ++i) {
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(currentCluster, bpb);
+        uint32_t nextClusterNum;
+        ssize_t bytesRead = pread(img_fd, &nextClusterNum, sizeof(uint32_t), fatOffset);
+
+        if (bytesRead != sizeof(uint32_t)) {
+            printf("Error reading FAT entry.\n");
+            free(buffer);
+            return;
+        }
+
+        if (is_end_of_file_or_bad_cluster(nextClusterNum)) {
+            printf("Error: Reached end of file or encountered a bad cluster.\n");
+            free(buffer);
+            return;
+        }
+
+        currentCluster = nextClusterNum;
+    }
+
+    // Calculate the actual offset in the FAT32 image
+    uint32_t firstDataSector = bpb.BPB_RsvdSecCnt + (bpb.BPB_NumFATs * bpb.BPB_FATSz32);
+    uint32_t dataRegionOffset = firstDataSector * bpb.BPB_BytsPerSec;
+    uint32_t actual_offset = ((currentCluster - 2) * clusterSize) + dataRegionOffset + intraClusterOffset;
+
+    // Read data from the file using pread
+    ssize_t bytes_read = pread(img_fd, buffer, size, actual_offset);
+    if (bytes_read == -1) {
+        perror("Error reading file");
+        free(buffer);
+        return;
+    }
+
+    // Process and output the read data
+    fwrite(buffer, 1, bytes_read, stdout);
+    
+    // Update the file offset in openFiles array
+    openFiles[fileIndex].offset += bytes_read;
+
+    free(buffer);
 }
 
 //GETS THE INPUT FROM THE COMMAND LINE
