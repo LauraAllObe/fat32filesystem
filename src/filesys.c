@@ -204,6 +204,10 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
                     printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
             }
         }
+        else
+        {
+            printf("command does not exist.\n");
+        }
         // else if cmd is ...
         // ...
         
@@ -211,7 +215,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
     }
 }
 
-//main function from which to execute initalizations, exits, and main loop
+//main function from which to open, close, mount, and call main function
 int main(int argc, char const *argv[])
 {
     // 0. check provided arguments (./filesys fat32.img)
