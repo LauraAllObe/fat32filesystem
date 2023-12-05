@@ -1350,35 +1350,46 @@ void seek_file(const char* filename, uint32_t offset) {
 
 // Find the starting cluster of the file (part 4)
 uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
-    uint32_t clusterNum = bpb.BPB_RootClus;
+    uint32_t dir_cluster = directory_location(fd_img, bpb);
+    if (dir_cluster == 0) {
+        return 0;
+    }
+
     uint32_t sectorSize = bpb.BPB_BytsPerSec;
     uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
-    uint32_t nextClusterNum;
     char buffer[clusterSize];
     dentry_t *dirEntry;
 
-    while (!is_end_of_file_or_bad_cluster(clusterNum)) {
-        uint32_t dataRegionOffset = 0x100400 + (clusterNum - 2) * clusterSize;
+    while (dir_cluster != 0xFFFFFFFF) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
         ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
 
         if (bytesRead <= 0) {
-            return 0;
+            return 0; // Error or end of directory
         }
 
         for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
             dirEntry = (dentry_t *)(buffer + i);
-            if (dirEntry->DIR_Name[0] == 0x00) {
-                return 0; // File not found
-            }
-            if (strncmp(dirEntry->DIR_Name, filename, 11) == 0) {
-                return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+
+            if (dirEntry->DIR_Name[0] == (char)0x00) return 0; // End of directory entries
+            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
+
+            if (strncmp(dirEntry->DIR_Name, filename, strlen(filename)) == 0 
+                && (dirEntry->DIR_Name[strlen(filename)] == (char)0x00 || dirEntry->DIR_Name[strlen(filename)] == (char)0x20)) {
+                // Check if entry is a file (and not a directory)
+                if (!(dirEntry->DIR_Attr & 0x10)) {
+                    return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+                }
             }
         }
 
-        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(clusterNum, bpb);
-        pread(fd_img, &nextClusterNum, sizeof(uint32_t), fatOffset);
-        clusterNum = nextClusterNum;
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+        if (pread(fd_img, &dir_cluster, sizeof(uint32_t), fatOffset) == -1) {
+            return 0; // Error reading from FAT
+        }
     }
+
     return 0; // File not found
 }
 
