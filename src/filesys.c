@@ -182,6 +182,48 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
+        else if (strcmp(tokens->items[0], "open") == 0) {
+            if (tokens->size != 3) {
+                printf("open command requires exactly two arguments: filename and mode\n");
+            } else {
+                const char* filename = tokens->items[1];
+                const char* mode = tokens->items[2];
+                open_file(filename, mode);
+            }
+        }
+         else if (strcmp(tokens->items[0], "close") == 0) {
+            if (tokens->size != 2) {
+                printf("close command requires exactly one argument: filename\n");
+            } else {
+                const char* filename = tokens->items[1];
+                close_file(filename);
+            }
+        }
+         else if (strcmp(tokens->items[0], "lsof") == 0) {
+            list_open_files();
+        }
+        else if (strcmp(tokens->items[0], "lseek") == 0) {
+            if (tokens->size != 3) {
+                printf("lseek command requires exactly two arguments: filename and offset\n");
+            } else {
+                const char* filename = tokens->items[1];
+                uint32_t offset = atoi(tokens->items[2]);
+                seek_file(filename, offset);
+            }
+        }
+        else if(strcmp(tokens->items[0], "read") == 0) {
+            if(tokens->size != 3) {
+                printf("read command requires exactly two arguments: filename and size\n");
+            } else {
+                const char* filename = tokens->items[1];
+                uint32_t size = atoi(tokens->items[2]);
+                if(size > 0) {
+                    read_file(filename, size, img_fd, bpb);
+                } else {
+                    printf("Invalid size for read command\n");
+                }
+            }
+        }
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size > 3)
             printf("rm command does not take more than three arguments\n");
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size < 2)
