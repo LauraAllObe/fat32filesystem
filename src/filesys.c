@@ -77,7 +77,7 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name);
 void list_content(int img_fd, bpb_t bpb);
 uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename);
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb);
-void open_file(const char* filename, const char* mode);
+void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb);
 void close_file(const char* filename);
 void list_open_files();
 void seek_file(const char* filename, uint32_t offset);
@@ -188,7 +188,7 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             } else {
                 const char* filename = tokens->items[1];
                 const char* mode = tokens->items[2];
-                open_file(filename, mode);
+                open_file(filename, mode, img_fd, bpb);
             }
         }
          else if (strcmp(tokens->items[0], "close") == 0) {
@@ -1271,13 +1271,20 @@ void free_tokens(tokenlist *tokens) {
 
 // Function definitions for part 4
 // OPEN FILE
-void open_file(const char* filename, const char* mode) {
+void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
     // Check if the file is already open
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (strcmp(openFiles[i].filename, filename) == 0) {
             printf("Error: File '%s' is already open.\n", filename);
             return;
         }
+    }
+
+    // Check if the file exists in the file system
+    uint32_t fileCluster = find_file_cluster(img_fd, bpb, filename);
+    if (fileCluster == 0) {
+        printf("Error: File '%s' does not exist.\n", filename);
+        return;
     }
 
     // Find an empty slot in openFiles
