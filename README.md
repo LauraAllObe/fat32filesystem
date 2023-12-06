@@ -29,7 +29,7 @@ On creat and mkdir, directory entries marked as deleted are cleared.
 - **Assigned to**: Laura Obermaier
 
 ### Part 4: Read [20 points]
-- **Responsibilities**: 
+- **Responsibilities**: Handles file operations such as opening, closing, listing, seeking, and reading within the current working directory. It includes commands to open files with specific modes (read-only, write-only, or both), maintain a structured record of opened files, and manage file access and offsets. The system also provides functionalities to close files, list all opened files with their details, and set or adjust file reading/writing offsets. 
 - **Assigned to**: Jeyma Rodriguez
 
 ### Part 5: Update [10 points]
