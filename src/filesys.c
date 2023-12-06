@@ -490,6 +490,12 @@ void remove_directory(int img_fd, bpb_t bpb, const char* dir_name) {
 }
 
 void remove_file(int img_fd, bpb_t bpb, const char* file_name) {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (strcmp(openFiles[i].filename, file_name) == 0) {
+            printf("can not remove an open file.\n", file_name);
+            return;
+        }
+    }
     if (!is_8_3_format(file_name)) {
         printf("%s is not in FAT32 8.3 format\n", file_name);
         return;
@@ -1411,6 +1417,7 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
 
     // Process and output the read data
     fwrite(buffer, 1, bytes_read, stdout);
+    printf("\n");
     
     // Update the file offset in openFiles array
     openFiles[fileIndex].offset += bytes_read;
