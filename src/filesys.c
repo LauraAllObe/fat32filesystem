@@ -108,6 +108,7 @@ typedef struct {
     char filename[11];  // 11 characters (8 for name, 3 for extension)
     char mode[3];       // Store "-r", "-w", "-rw", or "-wr"
     uint32_t offset;    // Offset in the file
+    char path[256];     // Path of the file
 } OpenFile;
 
 #define MAX_OPEN_FILES 10  // Maximum number of open files at a time
@@ -1244,6 +1245,7 @@ void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
         strcpy(openFiles[emptyIndex].filename, filename);
         strcpy(openFiles[emptyIndex].mode, mode);
         openFiles[emptyIndex].offset = 0;
+        strcpy(openFiles[emptyIndex].path, current_path); // Store the current path
     } else {
         printf("Error: Invalid mode '%s'.\n", mode);
     }
@@ -1266,8 +1268,20 @@ void list_open_files() {
     bool found = false;
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (strlen(openFiles[i].filename) > 0) {
-            printf("File: %s, Mode: %s, Offset: %u\n", openFiles[i].filename, 
-                    openFiles[i].mode, openFiles[i].offset);
+            char fullPath[512]; // Buffer for the full path
+
+            // Check if the current_path is root ("/") and format accordingly
+            if (strcmp(current_path, "/") == 0) {
+                // If current_path is root, avoid adding an extra slash
+                sprintf(fullPath, "/%s", openFiles[i].filename);
+            } else {
+                // Otherwise, concatenate current_path and filename
+                sprintf(fullPath, "%s/%s", current_path, openFiles[i].filename);
+            }
+
+            printf("Index: %d, File: %s, Mode: %s, Offset: %u, Path: %s\n", 
+                    i, openFiles[i].filename, 
+                    openFiles[i].mode, openFiles[i].offset, fullPath);
             found = true;
         }
     }
