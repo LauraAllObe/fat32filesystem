@@ -227,16 +227,33 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
          else if (strcmp(tokens->items[0], "lsof") == 0) {
             list_open_files();
         }
-        else if (strcmp(tokens->items[0], "lseek") == 0) {
+        else if (strcmp(tokens->items[0], "lseek") == 0 && tokens->size == 3) {
             int value = is_file(img_fd, bpb, tokens->items[1]);
             if(value == 1)
             {
-                if (tokens->size != 3) {
-                    printf("lseek command requires exactly two arguments: filename and offset\n");
+                const char* filename = tokens->items[1];
+                uint32_t offset = atoi(tokens->items[2]);
+                seek_file(filename, offset);
+            }
+            else if(value == 0)
+                printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
+            else if(value == -1)
+                printf("data region could not be read\n");
+            else if(value == -2)
+                printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
+        }
+        else if (strcmp(tokens->items[0], "lseek") == 0 && tokens->size != 3)
+            printf("lseek command requires exactly two arguments: filename and offset\n");
+        else if(strcmp(tokens->items[0], "read") == 0 && tokens->size == 3) {
+            int value = is_file(img_fd, bpb, tokens->items[1]);
+            if(value == 1)
+            {
+                const char* filename = tokens->items[1];
+                uint32_t size = atoi(tokens->items[2]);
+                if(size > 0) {
+                    read_file(filename, size, img_fd, bpb);
                 } else {
-                    const char* filename = tokens->items[1];
-                    uint32_t offset = atoi(tokens->items[2]);
-                    seek_file(filename, offset);
+                    printf("Invalid size for read command\n");
                 }
             }
             else if(value == 0)
@@ -246,29 +263,8 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
-        else if(strcmp(tokens->items[0], "read") == 0) {
-            int value = is_file(img_fd, bpb, tokens->items[1]);
-            if(value == 1)
-            {
-                if(tokens->size != 3) {
-                    printf("read command requires exactly two arguments: filename and size\n");
-                } else {
-                    const char* filename = tokens->items[1];
-                    uint32_t size = atoi(tokens->items[2]);
-                    if(size > 0) {
-                        read_file(filename, size, img_fd, bpb);
-                    } else {
-                        printf("Invalid size for read command\n");
-                    }
-                }
-            }
-            else if(value == 0)
-                printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
-            else if(value == -1)
-                printf("data region could not be read\n");
-            else if(value == -2)
-                printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
-        }
+        else if(strcmp(tokens->items[0], "read") == 0 && tokens->size != 3)
+            printf("read command requires exactly two arguments: filename and size\n");
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size > 3)
             printf("rm command does not take more than three arguments\n");
         else if(strcmp(tokens->items[0], "rm") == 0 && tokens->size < 2)
