@@ -191,17 +191,13 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
-        else if (strcmp(tokens->items[0], "open") == 0) {
+        else if (strcmp(tokens->items[0], "open") == 0 && tokens->size == 3) {
             int value = is_file(img_fd, bpb, tokens->items[1]);
             if(value == 1)
             {
-                if (tokens->size != 3) {
-                    printf("open command requires exactly two arguments: filename and mode\n");
-                } else {
-                    const char* filename = tokens->items[1];
-                    const char* mode = tokens->items[2];
-                    open_file(filename, mode, img_fd, bpb);
-                }
+                const char* filename = tokens->items[1];
+                const char* mode = tokens->items[2];
+                open_file(filename, mode, img_fd, bpb);
             }
             else if(value == 0)
                 printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
@@ -210,16 +206,14 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
-         else if (strcmp(tokens->items[0], "close") == 0) {
+        else if (strcmp(tokens->items[0], "open") == 0 && tokens->size != 3)
+            printf("open command requires exactly two arguments: filename and mode\n");
+        else if (strcmp(tokens->items[0], "close") == 0 && tokens->size == 2) {
             int value = is_file(img_fd, bpb, tokens->items[1]);
             if(value == 1)
             {
-                if (tokens->size != 2) {
-                    printf("close command requires exactly one argument: filename\n");
-                } else {
-                    const char* filename = tokens->items[1];
-                    close_file(filename);
-                }
+                const char* filename = tokens->items[1];
+                close_file(filename);
             }
             else if(value == 0)
                 printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
@@ -228,6 +222,8 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
         }
+        else if (strcmp(tokens->items[0], "close") == 0 && tokens->size != 2)
+            printf("close command requires exactly one argument: filename\n");
          else if (strcmp(tokens->items[0], "lsof") == 0) {
             list_open_files();
         }
