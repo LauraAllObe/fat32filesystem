@@ -1212,10 +1212,6 @@ void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
 
     // Check if the file exists in the file system
     uint32_t fileCluster = find_file_cluster(img_fd, bpb, filename);
-    if (fileCluster == 0) {
-        printf("Error: File '%s' does not exist.\n", filename);
-        return;
-    }
 
     // Find an empty slot in openFiles
     int emptyIndex = -1;
