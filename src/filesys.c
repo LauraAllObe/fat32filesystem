@@ -1270,13 +1270,11 @@ void list_open_files() {
         if (strlen(openFiles[i].filename) > 0) {
             char fullPath[512]; // Buffer for the full path
 
-            // Check if the current_path is root ("/") and format accordingly
-            if (strcmp(current_path, "/") == 0) {
-                // If current_path is root, avoid adding an extra slash
+            // Handle the root directory case
+            if (strcmp(openFiles[i].path, "/") == 0) {
                 sprintf(fullPath, "/%s", openFiles[i].filename);
             } else {
-                // Otherwise, concatenate current_path and filename
-                sprintf(fullPath, "%s/%s", current_path, openFiles[i].filename);
+                sprintf(fullPath, "%s/%s", openFiles[i].path, openFiles[i].filename);
             }
 
             printf("Index: %d, File: %s, Mode: %s, Offset: %u, Path: %s\n", 
