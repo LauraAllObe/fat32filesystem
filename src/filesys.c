@@ -88,7 +88,7 @@ void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
 //lists content of the current directory
 void list_content(int img_fd, bpb_t bpb);
-uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename);
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename, uint32_t* fileSize);
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb);
 void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb);
 void close_file(const char* filename);
@@ -109,6 +109,7 @@ typedef struct {
     char mode[3];       // Store "-r", "-w", "-rw", or "-wr"
     uint32_t offset;    // Offset in the file
     char path[256];     // Path of the file
+    uint32_t size;      // Size of the file
 } OpenFile;
 
 #define MAX_OPEN_FILES 10  // Maximum number of open files at a time
@@ -1202,6 +1203,7 @@ bool is_end_of_file_or_bad_cluster(uint32_t clus_num) {
 // Function definitions for part 4
 // OPEN FILE
 void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
+    uint32_t tempFileSize;
     // Check if the file is already open
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (strcmp(openFiles[i].filename, filename) == 0) {
@@ -1210,8 +1212,7 @@ void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
         }
     }
 
-    // Check if the file exists in the file system
-    uint32_t fileCluster = find_file_cluster(img_fd, bpb, filename);
+    uint32_t fileCluster = find_file_cluster(img_fd, bpb, filename, &tempFileSize);
 
     // Find an empty slot in openFiles
     int emptyIndex = -1;
@@ -1233,6 +1234,7 @@ void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb) {
         strcpy(openFiles[emptyIndex].filename, filename);
         strcpy(openFiles[emptyIndex].mode, mode);
         openFiles[emptyIndex].offset = 0;
+        openFiles[emptyIndex].size = tempFileSize; // Store the file size
         strcpy(openFiles[emptyIndex].path, current_path); // Store the current path
     } else {
         printf("Error: Invalid mode '%s'.\n", mode);
@@ -1258,13 +1260,11 @@ void list_open_files() {
         if (strlen(openFiles[i].filename) > 0) {
             char fullPath[512]; // Buffer for the full path
 
-            // Check if the current_path is root ("/") and format accordingly
-            if (strcmp(current_path, "/") == 0) {
-                // If current_path is root, avoid adding an extra slash
+            // Handle the root directory case
+            if (strcmp(openFiles[i].path, "/") == 0) {
                 sprintf(fullPath, "/%s", openFiles[i].filename);
             } else {
-                // Otherwise, concatenate current_path and filename
-                sprintf(fullPath, "%s/%s", current_path, openFiles[i].filename);
+                sprintf(fullPath, "%s/%s", openFiles[i].path, openFiles[i].filename);
             }
 
             printf("Index: %d, File: %s, Mode: %s, Offset: %u, Path: %s\n", 
@@ -1283,7 +1283,11 @@ void list_open_files() {
 void seek_file(const char* filename, uint32_t offset) {
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (strcmp(openFiles[i].filename, filename) == 0) {
-            // You may need additional logic here to check if the offset is valid (i.e., within the file size)
+            // Check if the offset is greater than the file size
+            if (offset > openFiles[i].size) {
+                printf("Error: Offset is larger than the size of the file '%s'.\n", filename);
+                return;
+            }
             openFiles[i].offset = offset;
             printf("Offset of file '%s' set to %u.\n", filename, offset);
             return;
@@ -1295,7 +1299,7 @@ void seek_file(const char* filename, uint32_t offset) {
 
 
 // Find the starting cluster of the file (part 4)
-uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
+uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename,  uint32_t* fileSize) {
     uint32_t dir_cluster = directory_location(fd_img, bpb);
     if (dir_cluster == 0) {
         return 0;
@@ -1324,6 +1328,10 @@ uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
                 && (dirEntry->DIR_Name[strlen(filename)] == (char)0x00 || dirEntry->DIR_Name[strlen(filename)] == (char)0x20)) {
                 // Check if entry is a file (and not a directory)
                 if (!(dirEntry->DIR_Attr & 0x10)) {
+                    // Set the file size
+                    if (fileSize != NULL) {
+                        *fileSize = dirEntry->DIR_FileSize;
+                    }
                     return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
                 }
             }
@@ -1341,6 +1349,7 @@ uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename) {
 
 // READ function implementation (PART 4)
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
+    uint32_t fileSize = 0;
     // Check if file is open and in read mode
     bool fileIsOpen = false;
     int fileIndex = -1;
@@ -1363,10 +1372,19 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
     }
 
     // Calculate the starting cluster of the file
-    uint32_t startCluster = find_file_cluster(img_fd, bpb, filename);
+    uint32_t startCluster = find_file_cluster(img_fd, bpb, filename, &fileSize);
     if (startCluster == 0) {
         printf("File '%s' not found in current directory.\n", filename);
         return;
+    }
+
+    // Check if offset + size is larger than the file size
+    if (openFiles[fileIndex].offset + size > fileSize) {
+        size = fileSize - openFiles[fileIndex].offset;
+        if (size == 0) {
+            printf("Read offset is at or past the end of the file.\n");
+            return;
+        }
     }
 
     // Buffer to store read data
