@@ -226,18 +226,16 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
                 printf("data region could not be read\n");
             else if(value == -2)
                 printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
-        } else if (strcmp(tokens->items[0], "append") == 0) 
+        } else if (strcmp(tokens->items[0], "append") == 0 && tokens->size != 3) 
+            printf("append command requires exactly two arguments: filename and data to append\n");
+        else if (strcmp(tokens->items[0], "append") == 0 && tokens->size == 3) 
 		{
             int value = is_file(img_fd, bpb, tokens->items[1]);
             if(value == 1)
             {
-                if (tokens->size != 3) {
-                    printf("append command requires exactly two arguments: filename and data to append\n");
-                } else {
-                    const char* filename = tokens->items[1];
-                    const char* data = tokens->items[2];
-                    append_to_file(img_fd, bpb, filename, data);
-                }
+                const char* filename = tokens->items[1];
+                const char* data = tokens->items[2];
+                append_to_file(img_fd, bpb, filename, data);
             }
             else if(value == 0)
                 printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
