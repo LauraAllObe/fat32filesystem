@@ -86,9 +86,13 @@ bool is_8_3_format_directory(const char* name);
 void new_directory(int fd_img, bpb_t bpb, const char* dir_name);
 //creates a new file
 void new_file(int fd_img, bpb_t bpb, const char* file_name);
+void append_to_file(int img_fd, bpb_t bpb, const char* file_name, const char* data);
+uint32_t find_last_cluster(int img_fd, bpb_t bpb, uint32_t first_cluster);
+void write_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, dentry_t* dirEntry, const char* file_name, uint32_t size);
 //lists content of the current directory
 void list_content(int img_fd, bpb_t bpb);
 uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename, uint32_t* fileSize);
+uint32_t find_file_start(int fd_img, bpb_t bpb, const char* filename);
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb);
 void open_file(const char* filename, const char* mode, int img_fd, bpb_t bpb);
 void close_file(const char* filename);
@@ -215,6 +219,25 @@ void main_process(int img_fd, const char* img_path, bpb_t bpb) {
             {
                 const char* filename = tokens->items[1];
                 close_file(filename);
+            }
+            else if(value == 0)
+                printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
+            else if(value == -1)
+                printf("data region could not be read\n");
+            else if(value == -2)
+                printf("%s is not in fat32 8.3 format\n", tokens->items[1]);
+        } else if (strcmp(tokens->items[0], "append") == 0) 
+		{
+            int value = is_file(img_fd, bpb, tokens->items[1]);
+            if(value == 1)
+            {
+                if (tokens->size != 3) {
+                    printf("append command requires exactly two arguments: filename and data to append\n");
+                } else {
+                    const char* filename = tokens->items[1];
+                    const char* data = tokens->items[2];
+                    append_to_file(img_fd, bpb, filename, data);
+                }
             }
             else if(value == 0)
                 printf("File named %s does not exist in the current directory.\n", tokens->items[1]);
@@ -975,6 +998,169 @@ void new_file(int fd_img, bpb_t bpb, const char* file_name) {
     uint32_t current_dir_cluster = directory_location(fd_img, bpb);
     append_dir_entry(fd_img, &new_file_entry, current_dir_cluster, bpb);
 }
+void append_to_file(int img_fd, bpb_t bpb, const char* file_name, const char* data)
+{
+	uint32_t fileSize;
+	uint32_t dir_cluster = directory_location(img_fd, bpb);
+	uint32_t file_cluster = find_file_cluster(img_fd, bpb, file_name, &fileSize);
+    int openFileIndex = -1;
+    for (int i = 0; i < MAX_OPEN_FILES; i++) 
+	{
+        if (strcmp(openFiles[i].filename, file_name) == 0) 
+		{ 
+           if((strcmp(openFiles[i].mode, "-w") == 0) || (strcmp(openFiles[i].mode, "-wr") == 0) || (strcmp(openFiles[i].mode, "-rw") == 0))
+           {
+				openFileIndex = i;
+				break;
+		   }
+           
+        }
+    }
+	
+	if (openFileIndex != -1)
+    {
+        // File found, continue with append operation
+        uint32_t last_cluster = find_last_cluster(img_fd, bpb, file_cluster);
+        uint32_t cluster_offset = convert_clus_num_to_offset_in_data_region(last_cluster, bpb);
+
+        // Find the directory entry for the file based on file cluster
+        uint32_t dir_cluster_offset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        char buffer[bpb.BPB_SecPerClus * bpb.BPB_BytsPerSec];
+        ssize_t bytesRead = pread(img_fd, buffer, sizeof(buffer), dir_cluster_offset);
+
+        if (bytesRead <= 0)
+        {
+            perror("Error reading directory entries");
+            return;
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t))
+        {
+            dentry_t *dirEntry = (dentry_t *)(buffer + i);
+            if (dirEntry->DIR_Name[0] == (char)0x00)
+            {
+                break; // End of directory entries
+            }
+
+            if (dirEntry->DIR_Name[0] == (char)0xE5 || strcmp(dirEntry->DIR_Name, ".") == 0 || strcmp(dirEntry->DIR_Name, "..") == 0)
+            {
+                continue; // Skip deleted entries and '.'/'..' entries
+            }
+            // Check if the entry matches the file cluster
+            if (dirEntry->DIR_FstClusLO == file_cluster)
+            {
+                // Calculate the size of the data to append
+                size_t data_size = strlen(data);
+
+                // Append data to the end of the file
+                if (pwrite(img_fd, data, data_size, cluster_offset + dirEntry->DIR_FileSize) == -1) {
+                    perror("Error writing data to file");
+                    return;
+                }
+
+                // Update file size in the directory entry
+                dirEntry->DIR_FileSize += data_size;
+                openFiles[openFileIndex].size += data_size;
+
+                // Save changes to the FAT32 image
+                write_directory_entry(img_fd, bpb, dir_cluster, dirEntry, file_name, openFiles[openFileIndex].size);
+
+                return; // Operation completed
+            }
+        }
+
+        printf("Error: Could not find directory entry for file '%s'.\n", file_name);
+    }
+    else
+    {
+        printf("'%s' not opened in write mode.\n", file_name);
+    }
+}
+
+uint32_t find_last_cluster(int img_fd, bpb_t bpb, uint32_t first_cluster) 
+{
+	uint32_t current_cluster = first_cluster;
+	uint32_t next_cluster;
+
+	// Traverse the cluster chain
+	while (!is_end_of_file_or_bad_cluster(current_cluster)) 
+	{
+		uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(current_cluster, bpb);
+		pread(img_fd, &next_cluster, sizeof(uint32_t), fatOffset);
+
+		if (is_end_of_file_or_bad_cluster(next_cluster)) 
+		{
+			return current_cluster; // Last cluster found
+		}
+
+		current_cluster = next_cluster;
+	}
+
+	return current_cluster;
+}
+
+void write_directory_entry(int img_fd, bpb_t bpb, uint32_t dir_cluster, dentry_t* dirEntry, const char* file_name, uint32_t size) 
+{
+	uint32_t sectorSize = bpb.BPB_BytsPerSec;
+	uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+	uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+	uint32_t cluster_offset = 0;
+
+	char buffer[clusterSize];
+	dentry_t *currentDirEntry;
+
+	// Iterate over directory entries
+	while (!is_end_of_file_or_bad_cluster(dir_cluster)) 
+	{
+		ssize_t bytesRead = pread(img_fd, buffer, clusterSize, dataRegionOffset);
+		
+		if (bytesRead <= 0) 
+		{
+			perror("Error reading directory entries");
+			return;
+		}
+
+		for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) 
+		{
+			currentDirEntry = (dentry_t *)(buffer + i);
+			
+			if (currentDirEntry->DIR_Name[0] == (char)0x00) 
+			{
+				return; // End of directory entries
+			}
+
+			if (currentDirEntry->DIR_Name[0] == (char)0xE5 || strcmp(currentDirEntry->DIR_Name, ".") == 0 || strcmp(currentDirEntry->DIR_Name, "..") == 0) 
+			{
+				continue; // Skip deleted entries and '.'/'..' entries
+			}
+
+			// Construct full entry name
+			char entryName[12];
+			memcpy(entryName, currentDirEntry->DIR_Name, 11);
+			entryName[11] = '\0';
+			// Check if the entry matches the target directory name
+			if (strncmp(entryName, dirEntry->DIR_Name, 11) == 0) 
+	        {
+	            // Update the directory entry size
+	            dirEntry->DIR_FileSize = size;
+	
+	            // Update the directory entry
+	            memcpy(buffer + i, dirEntry, sizeof(dentry_t));
+	            // Write the updated buffer back to the image
+	            pwrite(img_fd, buffer, bytesRead, dataRegionOffset + cluster_offset);
+	
+	            return;
+	        }
+		}
+
+		// Get next cluster number from FAT
+		uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+		pread(img_fd, &dir_cluster, sizeof(uint32_t), fatOffset);
+		cluster_offset += bytesRead;
+	}
+
+	perror("Directory entry not found for writing");
+}
 
 void write_dir_entry(int fd, dentry_t *dentry, uint32_t offset) {
     ssize_t wr_bytes = pwrite(fd, dentry, sizeof(dentry_t), offset);
@@ -1346,6 +1532,49 @@ uint32_t find_file_cluster(int fd_img, bpb_t bpb, const char* filename,  uint32_
 
     return 0; // File not found
 }
+uint32_t find_file_start(int fd_img, bpb_t bpb, const char* filename) {
+    uint32_t dir_cluster = directory_location(fd_img, bpb);
+    if (dir_cluster == 0) {
+        return 0;
+    }
+
+    uint32_t sectorSize = bpb.BPB_BytsPerSec;
+    uint32_t clusterSize = bpb.BPB_SecPerClus * sectorSize;
+    char buffer[clusterSize];
+    dentry_t *dirEntry;
+
+    while (dir_cluster != 0xFFFFFFFF) {
+        uint32_t dataRegionOffset = convert_clus_num_to_offset_in_data_region(dir_cluster, bpb);
+        ssize_t bytesRead = pread(fd_img, buffer, clusterSize, dataRegionOffset);
+
+        if (bytesRead <= 0) {
+            return 0; // Error or end of directory
+        }
+
+        for (uint32_t i = 0; i < bytesRead; i += sizeof(dentry_t)) {
+            dirEntry = (dentry_t *)(buffer + i);
+
+            if (dirEntry->DIR_Name[0] == (char)0x00) return 0; // End of directory entries
+            if (dirEntry->DIR_Name[0] == (char)0xE5) continue; // Skip deleted entries
+
+            if (strncmp(dirEntry->DIR_Name, filename, strlen(filename)) == 0 
+                && (dirEntry->DIR_Name[strlen(filename)] == (char)0x00 || dirEntry->DIR_Name[strlen(filename)] == (char)0x20)) {
+                // Check if entry is a file (and not a directory)
+                if (!(dirEntry->DIR_Attr & 0x10)) {
+                    return ((uint32_t)dirEntry->DIR_FstClusHI << 16) | (uint32_t)dirEntry->DIR_FstClusLO;
+                }
+            }
+        }
+
+        // Get next cluster number from FAT
+        uint32_t fatOffset = convert_clus_num_to_offset_in_fat_region(dir_cluster, bpb);
+        if (pread(fd_img, &dir_cluster, sizeof(uint32_t), fatOffset) == -1) {
+            return 0; // Error reading from FAT
+        }
+    }
+
+    return 0; // File not found
+}
 
 // READ function implementation (PART 4)
 void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
@@ -1377,7 +1606,6 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
         printf("File '%s' not found in current directory.\n", filename);
         return;
     }
-
     // Check if offset + size is larger than the file size
     if (openFiles[fileIndex].offset + size > fileSize) {
         size = fileSize - openFiles[fileIndex].offset;
@@ -1418,7 +1646,6 @@ void read_file(const char* filename, uint32_t size, int img_fd, bpb_t bpb) {
             free(buffer);
             return;
         }
-
         currentCluster = nextClusterNum;
     }
 
