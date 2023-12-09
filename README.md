@@ -29,12 +29,18 @@ On creat and mkdir, directory entries marked as deleted are cleared.
 - **Assigned to**: Laura Obermaier
 
 ### Part 4: Read [20 points]
-- **Responsibilities**: Handles file operations such as opening, closing, listing, seeking, and reading within the current working directory. It includes commands to open files with specific modes (read-only, write-only, or both), maintain a structured record of opened files, and manage file access and offsets. The system also provides functionalities to close files, list all opened files with their details, and set or adjust file reading/writing offsets. 
+- **Responsibilities**: Handles file operations such as opening, closing, listing, seeking, and 
+reading within the current working directory. It includes commands to open files with specific modes
+(read-only, write-only, or both), maintain a structured record of opened files, and manage file 
+access and offsets. The system also provides functionalities to close files, list all opened files 
+with their details, and set or adjust file reading/writing offsets. 
 - **Assigned to**: Jeyma Rodriguez
 
 ### Part 5: Update [10 points]
-- **Responsibilities**: 
-- **Assigned to**: 
+- **Responsibilities**: Allow users to append to a file. Must be non-space seperated and an open
+file with write permission. Note this implementation does not append to the end of a long file such
+as LONGFILE. Might not work in subdirectories. Only takes one token not "".
+- **Assigned to**: Autumn Harp
 
 ### Part 6: Delete [10 points]
 - **Responsibilities**: Handles the rm command and subsequent errors appropriately. These are 
@@ -67,7 +73,8 @@ make
 ./bin/filesys fat32.img
 
 ## Bugs
-N/A
+Append does not work on long files (i.e. LONGFILE), can only append one token not "", and might not
+work in subidrectories.
 
 ## Extra Credit
 - **Extra Credit __**: 
