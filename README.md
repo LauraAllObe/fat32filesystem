@@ -3,7 +3,7 @@ Design and implement a simple, user-space, shell-like utility that is capable of
 interpreting a FAT32 file system image. The program must understand the basic commands to
 manipulate the given file system image, must not corrupt the file system image, 
 and should be robust. 
-
+###### *Notes: some implementations are partial, such as the append command.*
 ## Group Members
 - **Jeyma Rodrìguez**: jdr21@fsu.edu
 - **Autumn Harp**: aom21a@fsu.edu
@@ -77,7 +77,7 @@ Append does not work on long files (i.e. LONGFILE), can only append one token no
 work in subidrectories.
 
 ## Extra Credit
-- **Extra Credit __**: 
+- **Extra Credit rm -r command: Laura Obermaier**: 
 
 ## Considerations
 N/A
