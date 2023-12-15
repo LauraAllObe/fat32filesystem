@@ -1336,7 +1336,9 @@ void clear_cluster(int fd, uint32_t cluster_num, bpb_t bpb) {
 
 uint32_t alloca_cluster(int fd, bpb_t bpb) {
     uint32_t min_clus_num = 2;
-    uint32_t max_clus_num = bpb.BPB_FATSz32;
+    //uint32_t max_clus_num = bpb.BPB_FATSz32;
+    uint32_t totalDataSectors = bpb.BPB_TotSec32 - (bpb.BPB_RsvdSecCnt + (bpb.BPB_NumFATs * bpb.BPB_FATSz32));
+    uint32_t max_clus_num = totalDataSectors / bpb.BPB_SecPerClus;
     uint32_t clus_clus_num = min_clus_num;
     uint32_t next_clus_num;
     
