@@ -1,4 +1,4 @@
-# Filesystem
+# FAT 32 Filesystem
 Design and implement a simple, user-space, shell-like utility that is capable of
 interpreting a FAT32 file system image. The program must understand the basic commands to
 manipulate the given file system image, must not corrupt the file system image, 
