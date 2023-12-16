@@ -4,6 +4,10 @@ interpreting a FAT32 file system image. The program must understand the basic co
 manipulate the given file system image, must not corrupt the file system image, 
 and should be robust. 
 ###### *Notes: some implementations are partial, such as the append command.*
+
+# Demonstration Video:
+[![](https://drive.google.com/uc?export=view&id=1W8ULly1Y_xJhkidqaRik8IN0dI4PwWW9)](https://youtu.be/PwfMXMGMbD8)
+
 ## Group Members
 - **Jeyma Rodrìguez**: jdr21@fsu.edu
 - **Autumn Harp**: aom21a@fsu.edu
