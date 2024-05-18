@@ -40,7 +40,7 @@ access and offsets. The system also provides functionalities to close files, lis
 with their details, and set or adjust file reading/writing offsets. 
 - **Assigned to**: Jeyma Rodriguez
 
-### Part 5: Update [10 points]
+### Part 5: Update [10 points] (NOT COMPLETED)
 - **Responsibilities**: Allow users to append to a file. Must be non-space seperated and an open
 file with write permission. Note this implementation does not append to the end of a long file such
 as LONGFILE. Might not work in subdirectories. Only takes one token not "".
